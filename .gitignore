@@ -1,0 +1,29 @@
+# Ignore build output directory
+/build
+/export
+
+# Ignore object files and dependent files
+.o
+.d
+
+#Ignore logs folder and log files
+/logs
+.log
+
+#Ignore lock files
+.lock
+
+.bin
+.pdi
+.vitisWorkspace.json
+
+_ide/logs
+_ide/.wsdata
+*.7z
+*.rar
+*.zip
+_ide/
+edemet/src/.cache/
+freertos_hello_world/
+platform/ps7_cortexa9_0/
+platform/zynq_fsbl/

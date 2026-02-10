@@ -1,0 +1,136 @@
+/dts-v1/;
+#include "zynq-7000.dtsi"
+#include "pl.dtsi"
+#include "pcw.dtsi"
+/ {
+	board = "styx";
+	compatible = "xlnx,styx";
+	device_id = "7z020";
+	slrcount = <1>;
+	family = "Zynq";
+	speed_grade = "1";
+	ps7_qspi_linear_0_memory: memory@fc000000 {
+		compatible = "xlnx,ps7-qspi-linear-1.00.a-memory";
+		xlnx,ip-name = "ps7_qspi_linear";
+		device_type = "memory";
+		memory_type = "linear_flash";
+		reg = <0xfc000000 0x1000000>;
+	};
+	ps7_ddr_0_memory: memory@00100000 {
+		compatible = "xlnx,ps7-ddr-1.00.a";
+		xlnx,ip-name = "ps7_ddr";
+		device_type = "memory";
+		memory_type = "memory";
+		reg = <0x00100000 0xFF00000>;
+	};
+	ps7_ram_0_memory: memory@0 {
+		compatible = "xlnx,ps7-ram-1.00.a";
+		xlnx,ip-name = "ps7_ram";
+		device_type = "memory";
+		memory_type = "memory";
+		reg = <0x0 0x30000>;
+	};
+	ps7_ram_1_memory: memory@ffff0000 {
+		compatible = "xlnx,ps7-ram-1.00.a";
+		xlnx,ip-name = "ps7_ram";
+		device_type = "memory";
+		memory_type = "memory";
+		reg = <0xffff0000 0xfe00>;
+	};
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+	aliases {
+		i2c2 = &I2C_MAGNET_PORTS_AXI_IIC_D;
+		serial0 = &uart0;
+		i2c3 = &I2C_MAGNET_PORTS_AXI_IIC_E;
+		serial1 = &coresight;
+		i2c4 = &I2C_MAGNET_PORTS_AXI_IIC_F;
+		i2c5 = &axi_iic_current;
+		i2c6 = &axi_iic_ioexp_1;
+		i2c7 = &axi_iic_ioexp_2;
+		i2c8 = &I2C_MAGNET_PORTS_AXI_IIC_A;
+		spi0 = &qspi;
+		i2c0 = &I2C_MAGNET_PORTS_AXI_IIC_B;
+		i2c1 = &I2C_MAGNET_PORTS_AXI_IIC_C;
+	};
+	cpus_a9: cpus-a9@0 {
+		compatible = "cpus,cluster";
+		address-map = <0xf0000000 &amba 0xf0000000 0x10000000>, 
+			      <0x00100000 &ps7_ddr_0_memory 0x00100000 0xFF00000>, 
+			      <0x0 &ps7_ram_0_memory 0x0 0x30000>, 
+			      <0xffff0000 &ps7_ram_1_memory 0xffff0000 0xfe00>, 
+			      <0x41200000 &axi_gpio_0 0x41200000 0x10000>, 
+			      <0x41210000 &axi_gpio_1 0x41210000 0x10000>, 
+			      <0x41220000 &axi_gpio_btn_led 0x41220000 0x10000>, 
+			      <0x41600000 &I2C_MAGNET_PORTS_AXI_IIC_A 0x41600000 0x10000>, 
+			      <0x41610000 &I2C_MAGNET_PORTS_AXI_IIC_B 0x41610000 0x10000>, 
+			      <0x41620000 &I2C_MAGNET_PORTS_AXI_IIC_C 0x41620000 0x10000>, 
+			      <0x41630000 &I2C_MAGNET_PORTS_AXI_IIC_D 0x41630000 0x10000>, 
+			      <0x41640000 &I2C_MAGNET_PORTS_AXI_IIC_E 0x41640000 0x10000>, 
+			      <0x41650000 &I2C_MAGNET_PORTS_AXI_IIC_F 0x41650000 0x10000>, 
+			      <0x41660000 &axi_iic_ioexp_1 0x41660000 0x10000>, 
+			      <0x41670000 &axi_iic_ioexp_2 0x41670000 0x10000>, 
+			      <0x41680000 &axi_iic_current 0x41680000 0x10000>, 
+			      <0x43c00000 &PWM_MagnetPWMController_0 0x43c00000 0x10000>, 
+			      <0x43c10000 &PWM_MagnetPWMController_1 0x43c10000 0x10000>, 
+			      <0x43c20000 &PWM_MagnetPWMController_2 0x43c20000 0x10000>, 
+			      <0x43c30000 &PWM_MagnetPWMController_3 0x43c30000 0x10000>, 
+			      <0x43c40000 &PWM_MagnetPWMController_4 0x43c40000 0x10000>, 
+			      <0x43c50000 &PWM_MagnetPWMController_5 0x43c50000 0x10000>, 
+			      <0x43c60000 &PWM_MagnetPWMController_6 0x43c60000 0x10000>, 
+			      <0x43c70000 &PWM_MagnetPWMController_7 0x43c70000 0x10000>, 
+			      <0x43c80000 &PWM_MagnetPWMController_8 0x43c80000 0x10000>, 
+			      <0x43c90000 &PWM_MagnetPWMController_9 0x43c90000 0x10000>, 
+			      <0x43ca0000 &PWM_MagnetPWMController_10 0x43ca0000 0x10000>, 
+			      <0x43cb0000 &PWM_MagnetPWMController_11 0x43cb0000 0x10000>, 
+			      <0x43cc0000 &PWM_MagnetPWMController_12 0x43cc0000 0x10000>, 
+			      <0x43cd0000 &PWM_MagnetPWMController_13 0x43cd0000 0x10000>, 
+			      <0x43ce0000 &PWM_MagnetPWMController_14 0x43ce0000 0x10000>, 
+			      <0x43cf0000 &PWM_MagnetPWMController_15 0x43cf0000 0x10000>, 
+			      <0x43d00000 &PWM_MagnetPWMController_16 0x43d00000 0x10000>, 
+			      <0x43d10000 &PWM_MagnetPWMController_17 0x43d10000 0x10000>, 
+			      <0x43d20000 &PWM_MagnetPWMController_18 0x43d20000 0x10000>, 
+			      <0x43d30000 &PWM_MagnetPWMController_19 0x43d30000 0x10000>, 
+			      <0x43d40000 &PWM_MagnetPWMController_20 0x43d40000 0x10000>, 
+			      <0x43d50000 &PWM_MagnetPWMController_21 0x43d50000 0x10000>, 
+			      <0x43d60000 &PWM_MagnetPWMController_22 0x43d60000 0x10000>, 
+			      <0x43d70000 &PWM_MagnetPWMController_23 0x43d70000 0x10000>, 
+			      <0x43d80000 &PWM_MagnetPWMController_24 0x43d80000 0x10000>, 
+			      <0x43d90000 &PWM_MagnetPWMController_25 0x43d90000 0x10000>, 
+			      <0x43da0000 &PWM_MagnetPWMController_26 0x43da0000 0x10000>, 
+			      <0x43db0000 &PWM_MagnetPWMController_27 0x43db0000 0x10000>, 
+			      <0x43dc0000 &PWM_MagnetPWMController_28 0x43dc0000 0x10000>, 
+			      <0x43dd0000 &PWM_MagnetPWMController_29 0x43dd0000 0x10000>, 
+			      <0xf8008000 &ps7_afi_0 0xf8008000 0x1000>, 
+			      <0xf8009000 &ps7_afi_1 0xf8009000 0x1000>, 
+			      <0xf800a000 &ps7_afi_2 0xf800a000 0x1000>, 
+			      <0xf800b000 &ps7_afi_3 0xf800b000 0x1000>, 
+			      <0xf8800000 &coresight 0xf8800000 0x100000>, 
+			      <0xf8006000 &mc 0xf8006000 0x1000>, 
+			      <0xf8007000 &devcfg 0xf8007000 0x100>, 
+			      <0xf8004000 &ps7_dma_ns 0xf8004000 0x1000>, 
+			      <0xf8003000 &dmac_s 0xf8003000 0x1000>, 
+			      <0xf8f00200 &global_timer 0xf8f00200 0x100>, 
+			      <0xf8900000 &ps7_gpv_0 0xf8900000 0x100000>, 
+			      <0xf8f01000 &intc 0xf8f01000 0x1000>, 
+			      <0xe0200000 &ps7_iop_bus_config_0 0xe0200000 0x1000>, 
+			      <0xf8f02000 &L2 0xf8f02000 0x1000>, 
+			      <0xf800c000 &ps7_ocmc_0 0xf800c000 0x1000>, 
+			      <0xf8891000 &ps7_pmu_0 0xf8891000 0x1000>, 
+			      <0xe000d000 &qspi 0xe000d000 0x1000>, 
+			      <0xfc000000 &ps7_qspi_linear_0_memory 0xfc000000 0x1000000>, 
+			      <0xf8f00000 &ps7_scuc_0 0xf8f00000 0xfd>, 
+			      <0xf8f00600 &scutimer 0xf8f00600 0x20>, 
+			      <0xf8f00620 &scuwdt 0xf8f00620 0xe0>, 
+			      <0xe0100000 &sdhci0 0xe0100000 0x1000>, 
+			      <0xf8000000 &slcr 0xf8000000 0x1000>, 
+			      <0xe0006000 &spi0 0xe0006000 0x1000>, 
+			      <0xf8001000 &ttc0 0xf8001000 0x1000>, 
+			      <0xf8002000 &ttc1 0xf8002000 0x1000>, 
+			      <0xe0000000 &uart0 0xe0000000 0x1000>, 
+			      <0xf8007100 &adc 0xf8007100 0x21>;
+		#ranges-address-cells = <0x1>;
+		#ranges-size-cells = <0x1>;
+	};
+};
