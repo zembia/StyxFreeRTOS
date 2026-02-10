@@ -27,3 +27,4 @@ edemet/src/.cache/
 freertos_hello_world/
 platform/ps7_cortexa9_0/
 platform/zynq_fsbl/
+platform/hw/sdt/dfx_runtime.txt

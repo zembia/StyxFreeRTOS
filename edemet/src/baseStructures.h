@@ -1,6 +1,9 @@
 
 #ifndef BASESTRUCTURES_H    
 #define BASESTRUCTURES_H
+#include "stdint.h"
+#include "stdbool.h"
+#include "FreeRTOS.h"
 
 #define MAX_MAGNETIC_FIELD 3000
 #define NUM_EM 30

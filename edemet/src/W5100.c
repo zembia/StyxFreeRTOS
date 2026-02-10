@@ -370,14 +370,12 @@ void W5100_ReadBuffer(W5100_Handle *handle, uint16_t addr, uint8_t *buf, uint16_
 
     W5100_ResetSS(handle);
     W5100_SPIEnd(handle);*/
-    /*
+    
     uint8_t *tx;
     tx = calloc(3 + len, sizeof(uint8_t));
     uint8_t *rx;
     rx = calloc(3 + len, sizeof(uint8_t));
-    */
-    uint8_t tx[3+len];
-    uint8_t rx[3+len];
+
 
     tx[0] = W5100_SPI_OP_READ;
     tx[1] = addr >> 8;
@@ -408,13 +406,11 @@ void W5100_WriteBuffer(W5100_Handle *handle, uint16_t addr, const uint8_t *buf, 
     W5100_ResetSS(handle);
     W5100_SPIEnd(handle);
     */
-/*  uint8_t *tx;
+    uint8_t *tx;
     tx = calloc(3 + len, sizeof(uint8_t));
     uint8_t *rx;
     rx = calloc(3 + len, sizeof(uint8_t));
-    */
-    uint8_t tx[3+len];
-    uint8_t rx[3+len];
+
     tx[0] = W5100_SPI_OP_WRITE;
     tx[1] = addr >> 8;
     tx[2] = addr & 0xFF;
