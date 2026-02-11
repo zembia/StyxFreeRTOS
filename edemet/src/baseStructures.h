@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "FreeRTOS.h"
+#include "semphr.h"
 
 #define MAX_MAGNETIC_FIELD 3000
 #define NUM_EM 30
@@ -48,7 +49,7 @@
     .delayTime = 0,                 \
     .currentTimeTick = 0,           \
     .relativeTimeTick = 0,          \
-    .currentStage = STAGE_UNDEFINED,\
+    .currentStage = STAGE_NONE,\
     .currentStatus = STATUS_STOP,   \
     .cmd = 0,                       \
     .signalSamplePeriodMs = 1000    \
@@ -84,9 +85,9 @@ typedef enum {
 } operation_cmd_t;
 
 typedef enum {    
-    STAGE_DELAY,
+    STAGE_DELAY = 0,
     STAGE_OPERATION,
-    STAGE_UNDEFINED    
+    STAGE_NONE    
 } operation_stage_t;
 
 typedef struct {

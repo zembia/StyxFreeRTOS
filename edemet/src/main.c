@@ -512,7 +512,7 @@ void vTaskLed(void *pvParameters)
 
             case STOP_STATE:
                 // Check if the operation is "Done" or just stopped
-                if (op->currentStage == STAGE_UNDEFINED && op->relativeTimeTick > 0) {
+                if (op->currentStage == STAGE_NONE && op->relativeTimeTick > 0) {
                     currentPattern = slowBlink;
                     patternLen = 20;
                 } else {
@@ -593,10 +593,10 @@ void vTaskMain(void *pvParameters)
                 }
                 else
                 {
-                    op->currentStage = STAGE_UNDEFINED;
+                    op->currentStage = STAGE_NONE;
                 }
 
-                if (op->currentStage != STAGE_UNDEFINED)
+                if (op->currentStage != STAGE_NONE)
                 {
                     op->currentState = PLAY_STATE;
                 }
@@ -633,7 +633,7 @@ void vTaskMain(void *pvParameters)
             {
                 if (op->relativeTimeTick >= op->operationTime)
                 {
-                    op->currentStage = STAGE_UNDEFINED;
+                    op->currentStage = STAGE_NONE;
                     op->relativeTimeTick = 0;
                     op->currentState = DONE_STATE;
                 }
@@ -761,7 +761,7 @@ void vTaskPwm(void *pvParameters)
                 }
 
                 // Don't do nothing if it's not the right stage.
-                if (op->currentStage == STAGE_UNDEFINED || op->currentStage == STAGE_DELAY)
+                if (op->currentStage == STAGE_NONE || op->currentStage == STAGE_DELAY)
                 {
                     // Disable all the outputs
                     op->outputsStatus = false;

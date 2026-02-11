@@ -6,6 +6,7 @@
 #include "W5100dhcp.h"
 #include "baseStructures.h"
 #include "globaldefines.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -1320,7 +1321,11 @@ static void TCP_Server_Task(void *pvParameters)
                     response[6] = VERSION_MINOR;
                     response[7] = VERSION_PATCH;
                     response[8] = op->currentState;
-                    response_length = 9;
+                    response[9] = op->currentStage;
+                    memcpy(response+10,(uint8_t*) & op->operationTime, sizeof(op->operationTime));
+                    memcpy(response+14,(uint8_t*) & op->delayTime, sizeof(op->delayTime));
+                    memcpy(response+18,(uint8_t*) & op->generalPlaybackIndex, sizeof(op->delayTime));
+                    response_length = 22;
                     break;
                 case CMD_CODE_READ_STATE:
                     xil_printf("Read state cmd\r\n");

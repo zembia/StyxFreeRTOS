@@ -7,7 +7,7 @@
 
 #define VERSION_MAYOR 0
 #define VERSION_MINOR 1
-#define VERSION_PATCH 0
+#define VERSION_PATCH 1
 
 #define device_internal_id 0x01
 
