@@ -32,7 +32,7 @@ const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_P
                             XPAR_PWM_MAGNETPWMCONTROLLER_28_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_29_BASEADDR
                             };
 
-
+void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B);
 void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel);
 
 
@@ -1030,6 +1030,17 @@ int main(void)
     xTaskCreate(vTaskEthernet   , "Eth"     , 8192 , &configK, tskIDLE_PRIORITY + 2, NULL);
     xTaskCreate(vTaskMain       , "Main"    , 512  , &configL, tskIDLE_PRIORITY + 1, NULL);
 
+
+    for (int i=0;i<30;i++){
+        if (i<10){
+            setledPanelColor(i, 10, 0, 0); // Red
+        } else if (i<20){
+            setledPanelColor(i, 0, 10, 0); // Green
+        } else {
+            setledPanelColor(i, 0, 0, 10); // Blue
+        }
+    }
+
     vTaskStartScheduler();
     // nada después de vTaskStartScheduler se ejecuta a menos que falle
     while (1)
@@ -1253,4 +1264,13 @@ static inline void put10s(uint8_t *buf, uint32_t index, int16_t value)
     buf[byte_offset + 1] = (cur >> 16) & 0xFF;
     buf[byte_offset + 2] = (cur >> 8)  & 0xFF;
     buf[byte_offset + 3] = cur & 0xFF;
+}
+
+
+
+void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B)
+{
+    uint32_t dataOut;
+    dataOut = LED<<24 | R<<16 | G<<8 | B;
+    Xil_Out32(XPAR_WS2812B_DRIVER_0_BASEADDR, dataOut);
 }

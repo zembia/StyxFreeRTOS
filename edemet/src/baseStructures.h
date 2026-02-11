@@ -22,6 +22,7 @@
 
 // Command codes
 #define CMD_CODE_CONFIG         0x0001
+#define CMD_CODE_CONFIG_READ    0x1001
 #define CMD_CODE_VECTOR_HEADER  0x0002
 #define CMD_CODE_READ_STATE     0x0003
 #define CMD_CODE_PLAY           0x0009
@@ -61,6 +62,8 @@ static inline void put10s(uint8_t *buf, uint32_t index, int16_t value);
 static inline void put11s(uint8_t *buf, uint32_t index, int16_t value);
 int16_t get11s(const uint8_t *buf, uint32_t index);
 
+
+#define SEND_PACKET_MAX_SIZE 1460
 
 typedef enum
 {

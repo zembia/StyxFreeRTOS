@@ -603,6 +603,20 @@
 			clock-names = "PL_CLK" , "s00_axi_aclk";
 			xlnx,name = "PWM_MagnetPWMController_9";
 		};
+		WS2812B_driver_0: WS2812B_driver@43de0000 {
+			compatible = "xlnx,WS2812B-driver-1.0";
+			xlnx,num-leds = <30>;
+			xlnx,s00-axi-data-width = <32>;
+			xlnx,ip-name = "WS2812B_driver";
+			reg = <0x43de0000 0x10000>;
+			clocks = <&clkc 15>, <&clkc 15>;
+			xlnx,edk-iptype = "PERIPHERAL";
+			status = "okay";
+			xlnx,system-clock = <100000000>;
+			xlnx,s00-axi-addr-width = <4>;
+			clock-names = "s00_axi_aclk" , "sys_clk";
+			xlnx,name = "WS2812B_driver_0";
+		};
 		axi_gpio_0: gpio@41200000 {
 			xlnx,gpio-board-interface = "Custom";
 			compatible = "xlnx,axi-gpio-2.0" , "xlnx,xps-gpio-1.00.a";

@@ -1189,13 +1189,13 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
 /**
  * @brief Example TCP Server Task (starts after DHCP succeeds)
  */
-
+uint8_t sock = 1;
 static void TCP_Server_Task(void *pvParameters)
 {
     operation_control_t *op =
         (operation_control_t *)pvParameters;
     
-    uint8_t sock = 1;
+    
     uint16_t server_port = 5005;
     uint16_t base = W5100_S0_BASE + (sock * 0x0100);
     uint8_t recv_buf[1500];
@@ -1207,9 +1207,12 @@ static void TCP_Server_Task(void *pvParameters)
     uint16_t tmp_wrapper_pkt_length = 0;
     uint32_t wrapper_pkt_length = 0;
     bool wrapped_cmd_available = false;
+    bool wrapped_snd_queried = false;
     uint8_t packet_type;
     uint16_t recv_size = 0;
     uint16_t cmd = 0;
+    uint16_t i;
+    uint32_t index_address;
     // Wait for DHCP to complete
     while (DHCP_GetState(&dhcp_handle) != DHCP_STATE_BOUND)
     {
@@ -1309,6 +1312,31 @@ static void TCP_Server_Task(void *pvParameters)
                     response[0] = RESPONSE_SUCCESS;
                     response_length = 1;
                     break;
+                case CMD_CODE_CONFIG_READ:
+                    xil_printf("Config read cmd\r\n");
+                    response[0] = RESPONSE_SUCCESS;
+                    //no se como se comporta memcpy, asi que lo hago a la antigua
+
+                    //Tiempo de reproduccion
+                    response[1] = ((op->operationTime)>> 24) &0xFF;
+                    response[2] = ((op->operationTime)>> 16) &0xFF;
+                    response[3] = ((op->operationTime)>> 8) &0xFF;
+                    response[4] = (op->operationTime) &0xFF;
+
+                    //Delay de reproduccion
+                    response[5] = ((op->delayTime)>> 24) &0xFF;
+                    response[6] = ((op->delayTime)>> 16) &0xFF;
+                    response[7] = ((op->delayTime)>> 8) &0xFF;
+                    response[8] = (op->delayTime) &0xFF;
+
+                    //Periodo de muestreo de la señal
+                    response[9] = ((op->signalSamplePeriodMs)>> 24) &0xFF;
+                    response[10] = ((op->signalSamplePeriodMs)>> 16) &0xFF;
+                    response[11] = ((op->signalSamplePeriodMs)>> 8) &0xFF;
+                    response[12] = (op->signalSamplePeriodMs) &0xFF;
+                    response_length = 13;                
+                    break;
+
                 case CMD_CODE_DISCOVER:
                     // DISCOVER
                     xil_printf("Discover cmd\r\n");
@@ -1329,7 +1357,37 @@ static void TCP_Server_Task(void *pvParameters)
                     break;
                 case CMD_CODE_READ_STATE:
                     xil_printf("Read state cmd\r\n");
+                    index_address = ((uint32_t)recv_buf[3] << 24) |
+                                    ((uint32_t)recv_buf[4] << 16) |
+                                    ((uint32_t)recv_buf[5] << 8) |
+                                    (uint32_t)recv_buf[6];
 
+                    if (index_address == 0xFFFFFFFF) {
+                        // Return current state of all EMs
+                        
+                        response[0] = RESPONSE_SUCCESS;
+                        response[1] = 0x00; //reserved for cell cuyrrent
+                        response[2] = 0x00;
+                        for (i=0; i<NUM_EM; i++) {
+                            response[3 + 2*i] = ((op->em[i].last_em_measure)>>8)&0xFF;
+                            response[3 + 2*i+1] = (op->em[i].last_em_measure)&0xFF;
+                            
+
+                            response[3 + 2*NUM_EM + 2*i] = ((op->em[i].last_em_temp)>>8)&0xFF;
+                            response[3 + 2*NUM_EM + 2*i+1] = (op->em[i].last_em_temp)&0xFF;
+
+                            response[3 + 4*NUM_EM + 2*i] = ((op->em[i].last_em_pwr)>>8)&0xFF;
+                            response[3 + 4*NUM_EM + 2*i+1] = (op->em[i].last_em_pwr)&0xFF;
+                        }
+                        response_length = 3 + NUM_EM*6; // 1 byte for success, NUM_EM for measurements, 2 bytes per temp, 2 bytes per power
+                    }
+                    else 
+                    {
+                        response[0] = RESPONSE_SUCCESS;
+                        response_length = 1; 
+                        //generateWrappedDataSend(index_address);
+                    }
+                    
                     break;
 
                 // New parsing for wrapper header (WRAPPER_HEADER_SIZE = 11)
@@ -1443,6 +1501,12 @@ static void TCP_Server_Task(void *pvParameters)
                 wrapper_pkt_index = 0;
                 wrapper_pkt_length = 0;
             }
+
+            if (wrapped_snd_queried)
+            {
+
+            }
+
             break;
         
         case W5100_SNSR_CLOSE_WAIT:
@@ -1510,4 +1574,126 @@ void put13s(uint8_t *buf, uint32_t index, int16_t value)
     buf[byte_offset + 1] = (cur >> 16) & 0xFF;
     buf[byte_offset + 2] = (cur >> 8) & 0xFF;
     buf[byte_offset + 3] = cur & 0xFF;
+}
+
+
+void generateWrappedDataSend(uint32_t start_index) {
+    // This function can be used to prepare a response that needs to be sent in multiple packets
+    // For example, if you want to send a large status report or a large vector back to the client
+    // You would set up the large_rx_buffer with the data to send, and then implement logic in the TCP_Server_Task
+    // to send it in chunks with the appropriate wrapper header (CMD_CODE_WRAPPER) indicating START, CONTINUE, END packets
+    
+    
+    uint32_t total_length;
+
+
+}
+
+
+extern uint8_t em_ctrl[NUM_EM][EM_VECTOR_SIZE];
+
+
+extern uint8_t em_measure[NUM_EM][EM_MEASURE_VECTOR_SIZE];
+
+
+extern uint8_t em_pwr[NUM_EM][EM_POWER_VECTOR_SIZE];
+
+
+extern uint8_t em_temp[NUM_EM][EM_TEMP_VECTOR_SIZE];
+
+
+extern uint8_t cfle_pwr[CFL_POWER_VECTOR_SIZE];
+
+
+//this function sends one packet per loop to avoid starvation of the TCP server task
+void bulkSendStateMachine(uint8_t start, uint32_t startSample)
+{
+    static uint8_t STATE = 0x00;
+    static uint8_t total_length = 0;
+    static uint8_t current_index = 0;
+    uint8_t response[SEND_PACKET_MAX_SIZE];
+    uint8_t *dataPointer = &response[3];
+    uint32_t currentSample = 0;
+    uint16_t i,j;
+    bool send_packet = false;
+    while(1)
+    {
+        switch(STATE)
+        {
+            case 0x00:
+
+                if (start)
+                {
+                    currentSample = startSample;
+                    response[0] = 0x00;
+                    response[1] = 0x03;
+                    response[2] = WRAPPER_START_PKT; // Placeholder for packet type (START, CONTINUE, END)                
+                    i = 3;
+                    //we send the starting sample of the packet
+                    //client should infer the rest of the samples based on the starting sample
+                    response[i++] = (currentSample>>16)&0xFF;
+                    response[i++] = (currentSample>>8)&0xFF;
+                    response[i++] = (currentSample)&0xFF;
+
+                    STATE = 0x01;
+                }
+                break;
+            case 0x01:
+                response[i++] = cfle_pwr[currentSample];                  
+                
+                for (j=0; j<NUM_EM; j++) {
+                    response[i++] = em_pwr[j][currentSample];
+                    response[i++] = em_temp[j][currentSample];
+                    response[i++] = em_measure[j][currentSample];
+                }
+                //we fillled the packet
+                if (i + NUM_EM*3+1 >= SEND_PACKET_MAX_SIZE-1)
+                {
+                    STATE = 0x02;
+                    send_packet = true;
+                }
+
+                break;
+            case 0x02:
+                currentSample++;
+                if (currentSample >= MAX_SAMPLES_PER_EM-1)
+                {
+                    response[2] = WRAPPER_END_PKT;
+                }
+                else
+                {
+                    response[2] = WRAPPER_MIDDLE_PKT;
+                }
+
+                i = 3;
+                //we send the starting sample of the packet
+                //client should infer the rest of the samples based on the starting sample
+                response[i++] = (currentSample>>16)&0xFF;
+                response[i++] = (currentSample>>8)&0xFF;
+                response[i++] = (currentSample)&0xFF;
+                
+                STATE = 0x01;
+
+                break;
+        }
+
+        //if we haven't sent any packet, we loop to fill the ethernet packet with no delay
+        if (send_packet == false && STATE != 0x00)
+        {
+            continue;
+        }
+        else
+        {
+            W5100_SendData(&w5100_handle, sock, response, i);
+            W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_SEND);
+            if (response[2] == WRAPPER_END_PKT)
+            {
+                STATE = 0x00;
+            }        
+            break;
+        }
+
+        
+    }
+
 }

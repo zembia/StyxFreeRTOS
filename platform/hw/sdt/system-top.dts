@@ -102,6 +102,7 @@
 			      <0x43db0000 &PWM_MagnetPWMController_27 0x43db0000 0x10000>, 
 			      <0x43dc0000 &PWM_MagnetPWMController_28 0x43dc0000 0x10000>, 
 			      <0x43dd0000 &PWM_MagnetPWMController_29 0x43dd0000 0x10000>, 
+			      <0x43de0000 &WS2812B_driver_0 0x43de0000 0x10000>, 
 			      <0xf8008000 &ps7_afi_0 0xf8008000 0x1000>, 
 			      <0xf8009000 &ps7_afi_1 0xf8009000 0x1000>, 
 			      <0xf800a000 &ps7_afi_2 0xf800a000 0x1000>, 
