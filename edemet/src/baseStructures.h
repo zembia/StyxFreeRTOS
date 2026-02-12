@@ -25,6 +25,7 @@
 #define CMD_CODE_CONFIG_READ    0x1001
 #define CMD_CODE_VECTOR_HEADER  0x0002
 #define CMD_CODE_READ_STATE     0x0003
+#define CMD_CODE_READ_TIME      0x0004
 #define CMD_CODE_PLAY           0x0009
 #define CMD_CODE_PAUSE          0x000A
 #define CMD_CODE_STOP           0x000B

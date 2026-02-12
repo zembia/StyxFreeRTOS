@@ -32,6 +32,7 @@ set(USER_COMPILE_SOURCES
 "i2cTools.c"
 "W5100.c"
 "W5100dhcp.c"
+"ledButtontools.c"
 )
 
 # -----------------------------------------

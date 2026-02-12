@@ -450,7 +450,7 @@ void vTaskEthernet(void *pvParameters)
 
     while (1)
     {
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -1015,20 +1015,56 @@ int main(void)
     configL.baseAddr = NULL;
     configL.waitSem = semLtoM; 
     configL.signalSem = semMtoN;
-    
+    BaseType_t taskStatus;
 
-    xTaskCreate(vTaskIoExp      , "IoExp1"  , 128  , &configA, tskIDLE_PRIORITY + 1, NULL);// Needs at least more thatn 64 
-    xTaskCreate(vTaskIoExp      , "IoExp2"  , 128  , &configB, tskIDLE_PRIORITY + 1, NULL);// Needs at least more thatn 64
-    xTaskCreate(vTaskMagnet     , "MagnetA" , 192  , &configC, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskMagnet     , "MagnetB" , 192  , &configD, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskMagnet     , "MagnetC" , 192  , &configE, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskMagnet     , "MagnetD" , 192  , &configF, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskMagnet     , "MagnetE" , 192  , &configG, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskMagnet     , "MagnetF" , 192  , &configH, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskPwm        , "Pwm"     , 2048  , &configI, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskLed        , "Led"     , 128  , &configJ, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vTaskEthernet   , "Eth"     , 8192 , &configK, tskIDLE_PRIORITY + 2, NULL);
-    xTaskCreate(vTaskMain       , "Main"    , 512  , &configL, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskIoExp      , "IoExp1"  , 128  , &configA, tskIDLE_PRIORITY + 1, NULL);// Needs at least more thatn 64 
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskIoExp1\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskIoExp      , "IoExp2"  , 128  , &configB, tskIDLE_PRIORITY + 1, NULL);// Needs at least more thatn 64
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskIoExp2\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetA" , 192  , &configC, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMagnetA\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetB" , 192  , &configD, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMagnetB\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetC" , 192  , &configE, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMagnetC\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetD" , 192  , &configF, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMagnetD\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetE" , 192  , &configG, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMagnetE\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetF" , 192  , &configH, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMagnetF\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskPwm        , "Pwm"     , 2048  , &configI, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskPwm\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskLed        , "Led"     , 128  , &configJ, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskLed\r\n");
+    }   
+    taskStatus = xTaskCreate(vTaskEthernet   , "Eth"     , 16384 , &configK, tskIDLE_PRIORITY + 2, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskEthernet\r\n");
+    }
+    taskStatus = xTaskCreate(vTaskMain       , "Main"    , 512  , &configL, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskMain\r\n");
+    }   
 
 
     for (int i=0;i<30;i++){

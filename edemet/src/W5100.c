@@ -18,6 +18,9 @@
 #define W5100_SnIR_SEND_OK 0x10
 #endif
 
+
+void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSample);
+
 /* Private function prototypes */
 static void W5100_SPIBegin(W5100_Handle *handle);
 static void W5100_SPIEnd(W5100_Handle *handle);
@@ -149,10 +152,20 @@ void ethernetInit(operation_control_t *op)
     xil_printf("===================================\r\n\r\n");
 
     /* Create DHCP task */
-    xTaskCreate(DHCP_Task, "DHCP", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);
+    BaseType_t status;
+    status = xTaskCreate(DHCP_Task, "DHCP", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);
+    if (status != pdPASS )
+    {
+        xil_printf("Failed to create DHCP task\r\n");
+    }
     // xTaskCreate(DHCP_Task, "DHCP", 2048, NULL, tskIDLE_PRIORITY + 2, NULL);
-    xTaskCreate(TCP_Server_Task, "TCP_Server", 1024, op, tskIDLE_PRIORITY + 1, NULL);
+    status = xTaskCreate(TCP_Server_Task, "TCP_Server", 4096, op, tskIDLE_PRIORITY + 2, NULL);
     // xTaskCreate(TCP_Server_Task, "TCP_Server", 2048, op, tskIDLE_PRIORITY + 1, NULL);
+
+    if (status != pdPASS )
+    {
+        xil_printf("Failed to create TCP Server task\r\n");
+    }
 
     return;
 }
@@ -1207,12 +1220,15 @@ static void TCP_Server_Task(void *pvParameters)
     uint16_t tmp_wrapper_pkt_length = 0;
     uint32_t wrapper_pkt_length = 0;
     bool wrapped_cmd_available = false;
-    bool wrapped_snd_queried = false;
     uint8_t packet_type;
     uint16_t recv_size = 0;
     uint16_t cmd = 0;
     uint16_t i;
     uint32_t index_address;
+    uint32_t end_index_address;
+    bool enableDataDump = false;
+
+    xil_printf("TCP Server: Waiting for DHCP bound\r\n");
     // Wait for DHCP to complete
     while (DHCP_GetState(&dhcp_handle) != DHCP_STATE_BOUND)
     {
@@ -1298,6 +1314,8 @@ static void TCP_Server_Task(void *pvParameters)
                     response[0] = RESPONSE_SUCCESS;
                     response_length = 1;
                     break;
+                
+ 
 
                 case CMD_CODE_CONFIG:
                     // Config
@@ -1312,6 +1330,8 @@ static void TCP_Server_Task(void *pvParameters)
                     response[0] = RESPONSE_SUCCESS;
                     response_length = 1;
                     break;
+                //Acording to description, these two commands do the same thing
+                case CMD_CODE_READ_TIME:
                 case CMD_CODE_CONFIG_READ:
                     xil_printf("Config read cmd\r\n");
                     response[0] = RESPONSE_SUCCESS;
@@ -1361,12 +1381,16 @@ static void TCP_Server_Task(void *pvParameters)
                                     ((uint32_t)recv_buf[4] << 16) |
                                     ((uint32_t)recv_buf[5] << 8) |
                                     (uint32_t)recv_buf[6];
+                    end_index_address = ((uint32_t)recv_buf[7] << 24) |
+                                    ((uint32_t)recv_buf[8] << 16) |
+                                    ((uint32_t)recv_buf[9] << 8) |
+                                    (uint32_t)recv_buf[10];
 
                     if (index_address == 0xFFFFFFFF) {
                         // Return current state of all EMs
                         
                         response[0] = RESPONSE_SUCCESS;
-                        response[1] = 0x00; //reserved for cell cuyrrent
+                       /* response[1] = 0x00; //reserved for cell cuyrrent
                         response[2] = 0x00;
                         for (i=0; i<NUM_EM; i++) {
                             response[3 + 2*i] = ((op->em[i].last_em_measure)>>8)&0xFF;
@@ -1380,11 +1404,14 @@ static void TCP_Server_Task(void *pvParameters)
                             response[3 + 4*NUM_EM + 2*i+1] = (op->em[i].last_em_pwr)&0xFF;
                         }
                         response_length = 3 + NUM_EM*6; // 1 byte for success, NUM_EM for measurements, 2 bytes per temp, 2 bytes per power
+                        */
+                       response_length = 1; // Just return success for now, can expand later with actual state data
                     }
                     else 
                     {
                         response[0] = RESPONSE_SUCCESS;
                         response_length = 1; 
+                        enableDataDump = true;
                         //generateWrappedDataSend(index_address);
                     }
                     
@@ -1501,11 +1528,8 @@ static void TCP_Server_Task(void *pvParameters)
                 wrapper_pkt_index = 0;
                 wrapper_pkt_length = 0;
             }
-
-            if (wrapped_snd_queried)
-            {
-
-            }
+            
+            //bulkSendStateMachine(enableDataDump,index_address,end_index_address);
 
             break;
         
@@ -1606,7 +1630,7 @@ extern uint8_t cfle_pwr[CFL_POWER_VECTOR_SIZE];
 
 
 //this function sends one packet per loop to avoid starvation of the TCP server task
-void bulkSendStateMachine(uint8_t start, uint32_t startSample)
+void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSample)
 {
     static uint8_t STATE = 0x00;
     static uint8_t total_length = 0;
@@ -1616,6 +1640,7 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample)
     uint32_t currentSample = 0;
     uint16_t i,j;
     bool send_packet = false;
+    uint16_t tempSample;
     while(1)
     {
         switch(STATE)
@@ -1631,6 +1656,7 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample)
                     i = 3;
                     //we send the starting sample of the packet
                     //client should infer the rest of the samples based on the starting sample
+                    response[i++] = (currentSample>>24)&0xFF;
                     response[i++] = (currentSample>>16)&0xFF;
                     response[i++] = (currentSample>>8)&0xFF;
                     response[i++] = (currentSample)&0xFF;
@@ -1639,15 +1665,30 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample)
                 }
                 break;
             case 0x01:
-                response[i++] = cfle_pwr[currentSample];                  
+
+                //cfle pwr is 10 bits
+                tempSample = get13s(cfle_pwr,currentSample);
+                response[i++] = (tempSample>>8)&0xFF;
+                response[i++] = (tempSample)&0xFF;
                 
                 for (j=0; j<NUM_EM; j++) {
-                    response[i++] = em_pwr[j][currentSample];
-                    response[i++] = em_temp[j][currentSample];
-                    response[i++] = em_measure[j][currentSample];
+                    //magnetic field is 13 bits
+                    tempSample = get13s(em_measure[j],currentSample);
+                    response[i++] = (tempSample>>8)&0xFF;
+                    response[i++] = (tempSample)&0xFF;
+                    
+                    //temperature is 11 bits
+                    tempSample = get11s(em_temp[j],currentSample);
+                    response[i++] = (tempSample>>8)&0xFF;
+                    response[i++] = (tempSample)&0xFF;
+
+                    //Power is 11 bits
+                    tempSample = get11s(em_pwr[j],currentSample);
+                    response[i++] = (tempSample>>8)&0xFF;
+                    response[i++] = (tempSample)&0xFF;
                 }
                 //we fillled the packet
-                if (i + NUM_EM*3+1 >= SEND_PACKET_MAX_SIZE-1)
+                if (i + NUM_EM*6+2 >= SEND_PACKET_MAX_SIZE-1)
                 {
                     STATE = 0x02;
                     send_packet = true;
@@ -1668,6 +1709,7 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample)
                 i = 3;
                 //we send the starting sample of the packet
                 //client should infer the rest of the samples based on the starting sample
+                response[i++] = (currentSample>>24)&0xFF;
                 response[i++] = (currentSample>>16)&0xFF;
                 response[i++] = (currentSample>>8)&0xFF;
                 response[i++] = (currentSample)&0xFF;
