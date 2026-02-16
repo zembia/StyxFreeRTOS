@@ -37,26 +37,6 @@ void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel);
 
 
 
-// Enable the cycle counter (call once at startup)
-void init_cycle_counter(void)
-{
-    // Enable Performance Monitor Control Register
-    asm volatile("MCR p15, 0, %0, c9, c12, 0" ::"r"(1));
-
-    // Enable Cycle Count Register
-    asm volatile("MCR p15, 0, %0, c9, c12, 1" ::"r"(0x80000000));
-
-    // Reset cycle counter
-    asm volatile("MCR p15, 0, %0, c9, c12, 2" ::"r"(0x80000000));
-}
-
-// Read cycle counter
-static inline uint32_t get_cycle_count(void)
-{
-    uint32_t value;
-    asm volatile("MRC p15, 0, %0, c9, c13, 0" : "=r"(value));
-    return value;
-}
 
 void vTaskPwm(void *pvParameters);
 void processCommand(char *);
@@ -634,7 +614,7 @@ void vTaskMain(void *pvParameters)
                 if (op->relativeTimeTick >= op->operationTime)
                 {
                     op->currentStage = STAGE_NONE;
-                    op->relativeTimeTick = 0;
+                    //op->relativeTimeTick = 0;
                     op->currentState = DONE_STATE;
                 }
             }

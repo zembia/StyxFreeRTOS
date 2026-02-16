@@ -19,7 +19,7 @@
 #endif
 
 
-void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSample);
+void bulkSendStateMachine(uint8_t start, uint32_t startSample,uint32_t endSample);
 
 /* Private function prototypes */
 static void W5100_SPIBegin(W5100_Handle *handle);
@@ -399,6 +399,8 @@ void W5100_ReadBuffer(W5100_Handle *handle, uint16_t addr, uint8_t *buf, uint16_
     XSpiPs_PolledTransfer(handle->config.spi_instance, tx, rx, 3 + len);
     W5100_ResetSS(handle);
     memcpy(buf, &rx[3], len);
+    free(tx);
+    free(rx);
 }
 /**
  * @brief Write multiple bytes to W5100
@@ -432,7 +434,9 @@ void W5100_WriteBuffer(W5100_Handle *handle, uint16_t addr, const uint8_t *buf, 
     W5100_SetSS(handle);
     XSpiPs_PolledTransfer(handle->config.spi_instance, tx, rx, 3 + len);
     W5100_ResetSS(handle);
-}
+    free(tx);
+    free(rx);
+}   
 
 /**
  * @brief Read 16-bit word from W5100
@@ -1370,9 +1374,10 @@ static void TCP_Server_Task(void *pvParameters)
                     response[7] = VERSION_PATCH;
                     response[8] = op->currentState;
                     response[9] = op->currentStage;
+                    uint32_t current_time = (op->generalPlaybackIndex * op->signalSamplePeriodMs) / 100;
                     memcpy(response+10,(uint8_t*) & op->operationTime, sizeof(op->operationTime));
                     memcpy(response+14,(uint8_t*) & op->delayTime, sizeof(op->delayTime));
-                    memcpy(response+18,(uint8_t*) & op->generalPlaybackIndex, sizeof(op->delayTime));
+                    memcpy(response+18,(uint8_t*) & (op->relativeTimeTick), sizeof(op->relativeTimeTick));
                     response_length = 22;
                     break;
                 case CMD_CODE_READ_STATE:
@@ -1390,21 +1395,21 @@ static void TCP_Server_Task(void *pvParameters)
                         // Return current state of all EMs
                         
                         response[0] = RESPONSE_SUCCESS;
-                       /* response[1] = 0x00; //reserved for cell cuyrrent
-                        response[2] = 0x00;
-                        for (i=0; i<NUM_EM; i++) {
-                            response[3 + 2*i] = ((op->em[i].last_em_measure)>>8)&0xFF;
-                            response[3 + 2*i+1] = (op->em[i].last_em_measure)&0xFF;
-                            
+                        // response[1] = 0x00; //reserved for cell cuyrrent
+                        // response[2] = 0x00;
+                        // for (i=0; i<NUM_EM; i++) {
+                        //     response[3 + 2*i] = ((op->em[i].last_em_measure)>>8)&0xFF;
+                        //     response[3 + 2*i+1] = (op->em[i].last_em_measure)&0xFF;
+                        //     
 
-                            response[3 + 2*NUM_EM + 2*i] = ((op->em[i].last_em_temp)>>8)&0xFF;
-                            response[3 + 2*NUM_EM + 2*i+1] = (op->em[i].last_em_temp)&0xFF;
+                        //     response[3 + 2*NUM_EM + 2*i] = ((op->em[i].last_em_temp)>>8)&0xFF;
+                        //     response[3 + 2*NUM_EM + 2*i+1] = (op->em[i].last_em_temp)&0xFF;
 
-                            response[3 + 4*NUM_EM + 2*i] = ((op->em[i].last_em_pwr)>>8)&0xFF;
-                            response[3 + 4*NUM_EM + 2*i+1] = (op->em[i].last_em_pwr)&0xFF;
-                        }
-                        response_length = 3 + NUM_EM*6; // 1 byte for success, NUM_EM for measurements, 2 bytes per temp, 2 bytes per power
-                        */
+                        //     response[3 + 4*NUM_EM + 2*i] = ((op->em[i].last_em_pwr)>>8)&0xFF;
+                        //     response[3 + 4*NUM_EM + 2*i+1] = (op->em[i].last_em_pwr)&0xFF;
+                        // }
+                        // response_length = 3 + NUM_EM*6; // 1 byte for success, NUM_EM for measurements, 2 bytes per temp, 2 bytes per power
+                        
                        response_length = 1; // Just return success for now, can expand later with actual state data
                     }
                     else 
@@ -1529,7 +1534,7 @@ static void TCP_Server_Task(void *pvParameters)
                 wrapper_pkt_length = 0;
             }
             
-            //bulkSendStateMachine(enableDataDump,index_address,end_index_address);
+            bulkSendStateMachine(enableDataDump,index_address, op->operationTime);
 
             break;
         
@@ -1630,7 +1635,7 @@ extern uint8_t cfle_pwr[CFL_POWER_VECTOR_SIZE];
 
 
 //this function sends one packet per loop to avoid starvation of the TCP server task
-void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSample)
+void bulkSendStateMachine(uint8_t start, uint32_t startSample,uint32_t endSample)
 {
     static uint8_t STATE = 0x00;
     static uint8_t total_length = 0;
@@ -1643,6 +1648,7 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSampl
     uint16_t tempSample;
     while(1)
     {
+
         switch(STATE)
         {
             case 0x00:
@@ -1697,7 +1703,7 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSampl
                 break;
             case 0x02:
                 currentSample++;
-                if (currentSample >= MAX_SAMPLES_PER_EM-1)
+                if (currentSample >= endSample-1)
                 {
                     response[2] = WRAPPER_END_PKT;
                 }
@@ -1720,7 +1726,11 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSampl
         }
 
         //if we haven't sent any packet, we loop to fill the ethernet packet with no delay
-        if (send_packet == false && STATE != 0x00)
+        if (STATE == 0x00)
+        {
+            break;
+        }
+        else if (send_packet == false && STATE != 0x00)
         {
             continue;
         }
@@ -1734,6 +1744,7 @@ void bulkSendStateMachine(uint8_t start, uint32_t startSample, uint32_t endSampl
             }        
             break;
         }
+
 
         
     }
