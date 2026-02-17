@@ -908,6 +908,8 @@ int main(void)
         op.em[i].em_measure = em_measure[i];
         op.em[i].em_pwr = em_pwr[i];
         op.em[i].em_temp = em_temp[i];
+        op.em[i].mode = 1;
+        op.em[i].magnetic_field_amplitude = 1500;
     }
     op.cfle_pwr = cfle_pwr;
     xil_printf("done\r\n");
