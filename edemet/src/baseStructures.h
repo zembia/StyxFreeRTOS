@@ -41,6 +41,7 @@
 #define RESPONSE_ERROR_INVALID_MODE           0x04
 #define RESPONSE_ERROR_VECTOR_TOO_LARGE       0x05
 #define RESPONSE_ERROR_ALLOCATION_FAILED      0x06
+#define RESPONSE_ERROR_INVALID_TIME           0x07
 
 
 #define CFG_EM_HEADER_LEN 19
@@ -164,5 +165,12 @@ typedef struct {
     SemaphoreHandle_t waitSem;   // Wait for this to start
     SemaphoreHandle_t signalSem; // Give this when done
 } task_manager_t;
+
+
+
+typedef struct {
+    uint8_t *buf;
+    uint32_t bitPos; // current bit position in buffer
+} BitWriter;
 
 #endif

@@ -19,8 +19,7 @@
 #define W5100_SnIR_SEND_OK 0x10
 #endif
 
-void bulkSendStateMachine(uint8_t start, uint32_t startSample,
-                          uint32_t endSample);
+uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op);
 
 /* Private function prototypes */
 static void W5100_SPIBegin(W5100_Handle *handle);
@@ -1127,7 +1126,6 @@ static void TCP_Server_Task(void *pvParameters) {
   uint32_t temporal_index_miliseconds;
   uint32_t index_address;
   uint32_t end_index_address;
-  bool enableDataDump = false;
   uint8_t em_ring_index;
   uint8_t em_id;
   uint8_t em_array_idx;
@@ -1301,61 +1299,15 @@ static void TCP_Server_Task(void *pvParameters) {
         case CMD_CODE_READ_STATE:
           xil_printf("Read state cmd\r\n");
 
-          temporal_index_miliseconds =
+            index_address =
               ((uint32_t)recv_buf[2] << 24) | ((uint32_t)recv_buf[3] << 16) |
               ((uint32_t)recv_buf[4] << 8) | (uint32_t)recv_buf[5];
 
-          index_address = temporal_index_miliseconds / op->signalSamplePeriodMs;
-
-          temporal_index_miliseconds =
+            end_index_address =
               ((uint32_t)recv_buf[6] << 24) | ((uint32_t)recv_buf[7] << 16) |
               ((uint32_t)recv_buf[8] << 8) | (uint32_t)recv_buf[9];
-
-          end_index_address =
-              temporal_index_miliseconds / op->signalSamplePeriodMs;
-
-          if (end_index_address == 0) {
-            end_index_address = op->operationTime / op->signalSamplePeriodMs;
-          }
-
-          if (index_address == 0xFFFFFFFF) {
-            // Return current state of all EMs
-
-            response[0] = (cmd & 0xFF00) >> 8;
-            response[1] = (cmd & 0x00FF);
-            response[2] = RESPONSE_SUCCESS;
-
-            // response[1] = 0x00; //reserved for cell cuyrrent
-            // response[2] = 0x00;
-            // for (i=0; i<NUM_EM; i++) {
-            //     response[3 + 2*i] = ((op->em[i].last_em_measure)>>8)&0xFF;
-            //     response[3 + 2*i+1] = (op->em[i].last_em_measure)&0xFF;
-            //
-
-            //     response[3 + 2*NUM_EM + 2*i] =
-            //     ((op->em[i].last_em_temp)>>8)&0xFF; response[3 + 2*NUM_EM +
-            //     2*i+1] = (op->em[i].last_em_temp)&0xFF;
-
-            //     response[3 + 4*NUM_EM + 2*i] =
-            //     ((op->em[i].last_em_pwr)>>8)&0xFF; response[3 + 4*NUM_EM +
-            //     2*i+1] = (op->em[i].last_em_pwr)&0xFF;
-            // }
-            // response_length = 3 + NUM_EM*6; // 1 byte for success, NUM_EM for
-            // measurements, 2 bytes per temp, 2 bytes per power
-
-            response_length = 1; // Just return success for now, can expand
-                                 // later with actual state data
-          } else {
-            response[0] = (cmd & 0xFF00) >> 8;
-            response[1] = (cmd & 0x00FF);
-            response[2] = RESPONSE_SUCCESS;
-
-            response_length = 1;
-            enableDataDump = true;
-            // generateWrappedDataSend(index_address);
-          }
-
-          break;
+            response_length = buildPacket(index_address,end_index_address,response,op);
+            break;
         case CMD_CODE_GET_EM_CONFIG:
           response[0] = (cmd & 0xFF00) >> 8;
           response[1] = (cmd & 0x00FF);
@@ -1510,7 +1462,6 @@ static void TCP_Server_Task(void *pvParameters) {
         wrapper_pkt_length = 0;
       }
 
-      bulkSendStateMachine(enableDataDump, index_address, op->operationTime);
 
       break;
     }
@@ -1608,108 +1559,119 @@ extern uint8_t em_temp[NUM_EM][EM_TEMP_VECTOR_SIZE];
 
 extern uint8_t cfle_pwr[CFL_POWER_VECTOR_SIZE];
 
-// this function sends one packet per loop to avoid starvation of the TCP server
-// task
-void bulkSendStateMachine(uint8_t start, uint32_t startSample,
-                          uint32_t endSample) {
-  static uint8_t STATE = 0x00;
-  static uint8_t total_length = 0;
-  static uint8_t current_index = 0;
-  uint8_t response[SEND_PACKET_MAX_SIZE];
-  uint8_t *dataPointer = &response[3];
-  uint32_t currentSample = 0;
-  uint16_t i, j;
-  bool send_packet = false;
-  uint16_t tempSample;
-  while (1) {
 
-    switch (STATE) {
-    case 0x00:
 
-      if (start) {
-        currentSample = startSample;
-        response[0] = 0x00;
-        response[1] = 0x03;
-        response[2] = 0x00;
-        response[3] = WRAPPER_START_PKT; // Placeholder for packet type (START,
-                                         // CONTINUE, END)
-        i = 4;
-        // we send the starting sample of the packet
-        // client should infer the rest of the samples based on the starting
-        // sample
-        response[i++] = (currentSample >> 24) & 0xFF;
-        response[i++] = (currentSample >> 16) & 0xFF;
-        response[i++] = (currentSample >> 8) & 0xFF;
-        response[i++] = (currentSample)&0xFF;
 
-        STATE = 0x01;
-      }
-      break;
-    case 0x01:
+static void bw_write(BitWriter *bw, uint32_t value, uint32_t bits)
+{
+    for (int i = bits - 1; i >= 0; --i) {
+        uint32_t bit = (value >> i) & 1;
 
-      // cfle pwr is 10 bits
-      tempSample = get13s(cfle_pwr, currentSample);
-      response[i++] = (tempSample >> 8) & 0xFF;
-      response[i++] = (tempSample)&0xFF;
+        uint32_t bytePos = bw->bitPos >> 3;
+        uint32_t bitOff  = 7 - (bw->bitPos & 7);
 
-      for (j = 0; j < NUM_EM; j++) {
-        // magnetic field is 13 bits
-        tempSample = get13s(em_measure[j], currentSample);
-        response[i++] = (tempSample >> 8) & 0xFF;
-        response[i++] = (tempSample)&0xFF;
+        if (bit)
+            bw->buf[bytePos] |= (1 << bitOff);
+        else
+            bw->buf[bytePos] &= ~(1 << bitOff);
 
-        // temperature is 11 bits
-        tempSample = get11s(em_temp[j], currentSample);
-        response[i++] = (tempSample >> 8) & 0xFF;
-        response[i++] = (tempSample)&0xFF;
+        bw->bitPos++;
+    }
+}
 
-        // Power is 11 bits
-        tempSample = get11s(em_pwr[j], currentSample);
-        response[i++] = (tempSample >> 8) & 0xFF;
-        response[i++] = (tempSample)&0xFF;
-      }
-      // we fillled the packet
-      if (i + NUM_EM * 6 + 2 >= SEND_PACKET_MAX_SIZE - 1) {
-        STATE = 0x02;
-        send_packet = true;
-      }
 
-      break;
-    case 0x02:
-      currentSample++;
-      if (currentSample >= endSample - 1) {
-        response[3] = WRAPPER_END_PKT;
-      } else {
-        response[3] = WRAPPER_MIDDLE_PKT;
-      }
+#define SAMPLE_SIZE 182
 
-      i = 4;
-      // we send the starting sample of the packet
-      // client should infer the rest of the samples based on the starting
-      // sample
-      response[i++] = (currentSample >> 24) & 0xFF;
-      response[i++] = (currentSample >> 16) & 0xFF;
-      response[i++] = (currentSample >> 8) & 0xFF;
-      response[i++] = (currentSample)&0xFF;
+uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op)
+{
+    //Validation 
 
-      STATE = 0x01;
+    if (buffer_reply == NULL)
+    {
+        return 0;
+    }
+    buffer_reply[0] = 0x00;
+    buffer_reply[1] = 0x03;
+    
 
-      break;
+    //translatin miliseconds to sample:
+    uint32_t realStartIndex,realEndIndex;
+    realStartIndex = start / op->signalSamplePeriodMs;
+    realEndIndex = end/op->signalSamplePeriodMs;
+
+
+
+    if (start>end)
+    {
+        buffer_reply[2] = RESPONSE_ERROR_INVALID_TIME;
+        return 3;
+    }
+    else
+    {
+        buffer_reply[2] = RESPONSE_SUCCESS;
+        return 3;
     }
 
-    // if we haven't sent any packet, we loop to fill the ethernet packet with
-    // no delay
-    if (STATE == 0x00) {
-      break;
-    } else if (send_packet == false && STATE != 0x00) {
-      continue;
-    } else {
-      W5100_SendData(&w5100_handle, sock, response, i);
-      W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_SEND);
-      if (response[3] == WRAPPER_END_PKT) {
-        STATE = 0x00;
-      }
-      break;
+    if (realEndIndex>  op->generalPlaybackIndex)
+    {
+        realEndIndex = op->generalPlaybackIndex;
     }
-  }
+
+    if (((realEndIndex-realStartIndex)*SAMPLE_SIZE+3)>SEND_PACKET_MAX_SIZE)
+    {
+       buffer_reply[2] =  RESPONSE_ERROR_VECTOR_TOO_LARGE;
+       return 3;
+    }
+
+    BitWriter bw;
+    bw.bitPos = 0;
+    bw.buf = &buffer_reply[7];
+
+    //placeholder
+    bool dummystart = false;
+
+    
+
+    
+    if (start != 0xFFFFFFFF)
+    {
+        buffer_reply[3] = ((start) >> 24) & 0xFF;
+        buffer_reply[4] = ((start) >> 16) & 0xFF;
+        buffer_reply[5] = ((start) >> 8) & 0xFF;
+        buffer_reply[6] =  (start) & 0xFF;
+        for (int j= realStartIndex; j<realEndIndex;j++)
+        {    
+            for (int i=0;i<30;i++)
+            {
+                bw_write(&bw, get13s(em_ctrl[i], j), 13); 
+                bw_write(&bw, get13s(em_measure[i], j), 13); 
+                bw_write(&bw, get11s(em_temp[i], j), 11);
+                bw_write(&bw, get11s(em_pwr[i], j), 11);
+            }
+            bw_write(&bw,dummystart, 1);
+            bw_write(&bw,get13s(cfle_pwr, j), 15);
+        }
+        return 7+(realEndIndex-realStartIndex)*SAMPLE_SIZE;
+    }
+    else
+    {
+        uint32_t time;
+        time = xTaskGetTickCount()*portTICK_PERIOD_MS;
+        buffer_reply[3] = ((time) >> 24) & 0xFF;
+        buffer_reply[4] = ((time) >> 16) & 0xFF;
+        buffer_reply[5] = ((time) >> 8) & 0xFF;
+        buffer_reply[6] =  (time) & 0xFF;
+ 
+        for (int i=0;i<30;i++)
+        {
+            bw_write(&bw, op->em[i].last_em_ctrl, 13); 
+            bw_write(&bw, op->em[i].last_em_measure, 13); 
+            bw_write(&bw, op->em[i].last_em_temp, 11);
+            bw_write(&bw, op->em[i].last_em_pwr, 11);
+        }
+        bw_write(&bw,dummystart, 1);
+        bw_write(&bw,op->last_cfle_pwr, 15);
+        
+        return 7+SAMPLE_SIZE;
+    }
 }
