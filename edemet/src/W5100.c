@@ -19,8 +19,16 @@
 #define W5100_SnIR_SEND_OK 0x10
 #endif
 
-uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op);
 
+#define DEBUG_DATA
+
+#ifdef DEBUG_DATA
+  uint16_t debug_data = 0;
+#endif
+
+
+uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op);
+uint16_t buildPacketEMconfig(uint32_t start, uint32_t end, uint8_t em_ring_index, uint8_t em_id, uint8_t *buffer_reply,operation_control_t *op);
 /* Private function prototypes */
 static void W5100_SPIBegin(W5100_Handle *handle);
 static void W5100_SPIEnd(W5100_Handle *handle);
@@ -152,7 +160,7 @@ void ethernetInit(operation_control_t *op) {
     xil_printf("Failed to create DHCP task\r\n");
   }
   // xTaskCreate(DHCP_Task, "DHCP", 2048, NULL, tskIDLE_PRIORITY + 2, NULL);
-  status = xTaskCreate(TCP_Server_Task, "TCP_Server", 4096, op,
+  status = xTaskCreate(TCP_Server_Task, "TCP_Server", 8192, op,
                        tskIDLE_PRIORITY + 2, NULL);
   // xTaskCreate(TCP_Server_Task, "TCP_Server", 2048, op, tskIDLE_PRIORITY + 1,
   // NULL);
@@ -1111,7 +1119,7 @@ static void TCP_Server_Task(void *pvParameters) {
   uint16_t server_port = 5005;
   uint16_t base = W5100_S0_BASE + (sock * 0x0100);
   uint8_t recv_buf[1500];
-  uint8_t response[128];
+  uint8_t response[SEND_PACKET_MAX_SIZE];
   uint8_t response_length = 0;
   uint32_t tmp_wrapper_pkt_index = 0;
   uint32_t wrapper_pkt_index = 0;
@@ -1129,6 +1137,9 @@ static void TCP_Server_Task(void *pvParameters) {
   uint8_t em_ring_index;
   uint8_t em_id;
   uint8_t em_array_idx;
+
+  uint32_t startTime,endTime;
+
 
   xil_printf("TCP Server: Waiting for DHCP bound\r\n");
   // Wait for DHCP to complete
@@ -1345,6 +1356,17 @@ static void TCP_Server_Task(void *pvParameters) {
           response[15] = op->em[em_array_idx].coils_columns;
           response_length = 16;
 
+          break;
+        case CMD_CODE_GET_EM_CFG_VECTOR:
+
+          em_ring_index = recv_buf[2];
+          em_id = recv_buf[3];                    
+          startTime =  ((uint32_t)recv_buf[3] << 24) | ((uint32_t)recv_buf[4] << 16) |
+              ((uint32_t)recv_buf[5] << 8) | (uint32_t)recv_buf[6];
+          endTime = ((uint32_t)recv_buf[7] << 24) | ((uint32_t)recv_buf[8] << 16) |
+              ((uint32_t)recv_buf[9] << 8) | (uint32_t)recv_buf[10];
+          
+          response_length = buildPacketEMconfig(startTime,endTime,em_ring_index,em_id,response,op);
           break;
         // New parsing for wrapper header (WRAPPER_HEADER_SIZE = 11)
         case CMD_CODE_WRAPPER:
@@ -1584,6 +1606,8 @@ static void bw_write(BitWriter *bw, uint32_t value, uint32_t bits)
 
 uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op)
 {
+
+
     //Validation 
 
     if (buffer_reply == NULL)
@@ -1606,7 +1630,7 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
         buffer_reply[2] = RESPONSE_ERROR_INVALID_TIME;
         return 3;
     }
-    else
+    else if (start != 0xFFFFFFFF)
     {
         buffer_reply[2] = RESPONSE_SUCCESS;
         return 3;
@@ -1617,7 +1641,7 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
         realEndIndex = op->generalPlaybackIndex;
     }
 
-    if (((realEndIndex-realStartIndex)*SAMPLE_SIZE+3)>SEND_PACKET_MAX_SIZE)
+    if ((((realEndIndex-realStartIndex)*SAMPLE_SIZE+3)>SEND_PACKET_MAX_SIZE) &&  (start != 0xFFFFFFFF))
     {
        buffer_reply[2] =  RESPONSE_ERROR_VECTOR_TOO_LARGE;
        return 3;
@@ -1630,7 +1654,9 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
     //placeholder
     bool dummystart = false;
 
-    
+    #ifdef DEBUG_DATA
+      debug_data++;
+    #endif
 
     
     if (start != 0xFFFFFFFF)
@@ -1656,7 +1682,7 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
     else
     {
         uint32_t time;
-        time = xTaskGetTickCount()*portTICK_PERIOD_MS;
+        time = xTaskGetTickCount()/configTICK_RATE_HZ*1000;
         buffer_reply[3] = ((time) >> 24) & 0xFF;
         buffer_reply[4] = ((time) >> 16) & 0xFF;
         buffer_reply[5] = ((time) >> 8) & 0xFF;
@@ -1664,14 +1690,85 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
  
         for (int i=0;i<30;i++)
         {
-            bw_write(&bw, op->em[i].last_em_ctrl, 13); 
-            bw_write(&bw, op->em[i].last_em_measure, 13); 
-            bw_write(&bw, op->em[i].last_em_temp, 11);
-            bw_write(&bw, op->em[i].last_em_pwr, 11);
+            #ifdef DEBUG_DATA
+              bw_write(&bw, debug_data, 13); 
+              bw_write(&bw, debug_data, 13); 
+              bw_write(&bw, debug_data, 11);
+              bw_write(&bw, debug_data, 11);
+            #else
+              bw_write(&bw, op->em[i].last_em_ctrl, 13); 
+              bw_write(&bw, op->em[i].last_em_measure, 13); 
+              bw_write(&bw, op->em[i].last_em_temp, 11);
+              bw_write(&bw, op->em[i].last_em_pwr, 11);
+            #endif
         }
-        bw_write(&bw,dummystart, 1);
-        bw_write(&bw,op->last_cfle_pwr, 15);
+        #ifdef DEBUG_DATA
+          bw_write(&bw, debug_data, 1);
+          bw_write(&bw, debug_data, 15);
+        #else
+          bw_write(&bw,dummystart, 1);
+          bw_write(&bw,op->last_cfle_pwr, 15);
+        #endif
+        
         
         return 7+SAMPLE_SIZE;
     }
+}
+
+uint16_t buildPacketEMconfig(uint32_t start, uint32_t end, uint8_t em_ring_index, uint8_t em_id, uint8_t *buffer_reply,operation_control_t *op)
+{
+    if (buffer_reply == NULL)
+    {
+        return 0;
+    }
+    buffer_reply[0] = 0x10;
+    buffer_reply[1] = 0x12;
+
+    if (em_ring_index > 2) {
+        buffer_reply[2] = RESPONSE_ERROR_INVALID_RING;
+        return 3;
+    } else if (em_id > 9) {
+        buffer_reply[2] = RESPONSE_ERROR_INVALID_EM;
+        return 3;
+    } else {
+        buffer_reply[2] = RESPONSE_SUCCESS;
+    }
+
+    uint8_t em_array_idx = em_ring_index * 10 + em_id;
+
+    buffer_reply[3] = ((start) >> 24) & 0xFF;
+    buffer_reply[4] = ((start) >> 16) & 0xFF;
+    buffer_reply[5] = ((start) >> 8) & 0xFF;
+    buffer_reply[6] =  (start) & 0xFF;
+
+    BitWriter bw;
+    bw.bitPos = 0;
+    bw.buf = &buffer_reply[7];
+    memset(bw.buf, 0, SEND_PACKET_MAX_SIZE - 7);
+
+     //translatin miliseconds to sample:
+    uint32_t realStartIndex,realEndIndex;
+    realStartIndex = start / op->signalSamplePeriodMs;
+    realEndIndex = end/op->signalSamplePeriodMs;
+
+
+    //Check if the requested range would exceed the max packet size
+    if (realEndIndex-realStartIndex > (SEND_PACKET_MAX_SIZE - 7) * 8 / 13) {
+        buffer_reply[2] = RESPONSE_ERROR_VECTOR_TOO_LARGE;
+        return 3;
+    }
+
+    #ifdef DEBUG_DATA
+      debug_data++;
+    #endif
+
+    for (int j= realStartIndex; j<realEndIndex;j++)
+    {    
+        #ifdef DEBUG_DATA
+          bw_write(&bw, debug_data, 13);
+        #else
+          bw_write(&bw, get13s(op->em[em_array_idx].em_ctrl, j), 13);
+        #endif
+    }
+    return 7+((realEndIndex-realStartIndex)*13+7)/8; //Ceiling of bits to bytes
 }

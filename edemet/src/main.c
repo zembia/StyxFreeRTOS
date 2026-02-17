@@ -238,7 +238,7 @@ void vTaskMagnet(void *pvParameters)
     while (1)
     {        
         if (group_index != 0) {
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
         // ======== STEP 1 ========
@@ -542,7 +542,7 @@ void vTaskMain(void *pvParameters)
 
     while (1)
     {
-        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(50)); // TIME_PATCH: 100
+        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(100)); // TIME_PATCH: 100
         timeTick++;
 
         if (op->relativeTimeTick % 10 == 0 && op->relativeTimeTick > 0 && op->relativeTimeTick != prevRelativeTimeTick)
@@ -868,13 +868,23 @@ void vTaskPwm(void *pvParameters)
                                 op->generalPlaybackIndex,
                                 op->em[i].last_em_pwr
                             );
+                        //xil_printf("tick count: %u\r\n",xTaskGetTickCount());       
                     }
 
                     setDutyCycle(i, pwmValue);
                 }
         }
 
-        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(4 + op->signalSamplePeriodMs / 2)); // TIME_PATCH (op->signalSamplePeriodMs)
+        if (op->signalSamplePeriodMs<4)
+        {
+            vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(4));
+        }
+        else
+        {
+            vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(op->signalSamplePeriodMs)); 
+        }
+
+        
 
         prevState = op->currentState;
     }
