@@ -20,7 +20,7 @@
 #endif
 
 
-#define DEBUG_DATA
+//#define DEBUG_DATA
 
 #ifdef DEBUG_DATA
   uint16_t debug_data = 0;
@@ -1523,7 +1523,7 @@ static void TCP_Server_Task(void *pvParameters) {
       break;
     }
 
-    vTaskDelay(1);
+    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 

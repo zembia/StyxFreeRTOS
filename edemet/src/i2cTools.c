@@ -25,6 +25,163 @@
 
 uint8_t ioexp_addr[]={IOEXP1_ADDR,IOEXP2_ADDR,IOEXP3_ADDR};
 
+// I2C bus recovery functions
+/**
+ * @brief Check if I2C bus is idle
+ */
+bool I2C_CheckBusIdle(UINTPTR BaseAddress) {
+    u16 StatusReg = XIic_ReadReg(BaseAddress, XIIC_SR_REG_OFFSET);
+    return !(StatusReg & XIIC_SR_BUS_BUSY_MASK);
+}
+
+/**
+ * @brief Reset I2C bus - clears errors and reinitializes
+ */
+void I2C_ResetBus(UINTPTR BaseAddress) {
+    // Clear all interrupt flags
+    XIic_WriteReg(BaseAddress, XIIC_IISR_OFFSET, 0xFFFFFFFF);
+    
+    // Software reset
+    XIic_WriteReg(BaseAddress, XIIC_RESETR_OFFSET, 0x0A);
+    
+
+    //Do timing adjustment
+
+    xil_printf("Timing TSUSTA reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x128));
+    xil_printf("Timing TSUSTB  reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x12C));
+    xil_printf("Timing THDSTA  reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x130));
+    xil_printf("Timing TSUDAT  reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x134));
+    xil_printf("Timing TBUF    reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x138));
+    xil_printf("Timing THIGH   reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x13C));
+    xil_printf("Timing TLOW    reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x140));
+    xil_printf("Timing THDDAT     reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x144));
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+    uint32_t CntlReg = XIic_ReadReg(BaseAddress,  XIIC_CR_REG_OFFSET);
+    CntlReg = XIIC_CR_MSMS_MASK | XIIC_CR_ENABLE_DEVICE_MASK;		
+    //XIic_WriteReg(BaseAddress,  XIIC_CR_REG_OFFSET, CntlReg);
+
+    //XIic_WriteReg(BaseAddress, 0x138, 0x0F4);
+    //XIic_WriteReg(BaseAddress, 0x144, 200);
+    
+
+    
+    
+    xil_printf("[I2C RESET] Bus at 0x%08x reset\r\n", BaseAddress);
+}
+
+/**
+ * @brief Safe I2C send with timeout and error recovery
+ */
+bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option) {
+    //return XIic_Send(BaseAddress,DevAddr,data,len,option);
+
+    int retries = 3;
+    
+    while (retries-- > 0) {
+        // Check if bus is stuck
+        int timeout = 50;
+        while (!I2C_CheckBusIdle(BaseAddress) && timeout-- > 0) {
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+        
+        if (timeout <= 0) {
+            xil_printf("[I2C] Bus stuck before send, resetting...\r\n");
+            I2C_ResetBus(BaseAddress);
+            continue;
+        }
+        
+        // Clear pending interrupts
+        XIic_WriteReg(BaseAddress, XIIC_IISR_OFFSET, 0xFFFFFFFF);
+        
+        // Attempt send
+        int sent = XIic_Send(BaseAddress, DevAddr, data, len, option);
+        
+        if (sent == len) {
+            // Wait for completion with timeout
+            timeout = 100;
+            while (timeout-- > 0) {
+                u16 StatusReg = XIic_ReadReg(BaseAddress, XIIC_SR_REG_OFFSET);
+                if (!(StatusReg & XIIC_SR_BUS_BUSY_MASK)) {
+                    // Check for errors
+                    u16 IrqReg = XIic_ReadReg(BaseAddress, XIIC_IISR_OFFSET);
+                    if (IrqReg & (XIIC_INTR_ARB_LOST_MASK | XIIC_INTR_TX_ERROR_MASK)) {
+                        XIic_WriteReg(BaseAddress, XIIC_IISR_OFFSET, IrqReg);
+                        xil_printf("[I2C] Send error detected\r\n");
+                        break;
+                    }
+                    return true; // Success!
+                }
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
+            
+            xil_printf("[I2C] Send timeout\r\n");
+        }
+        
+        // Failed - reset and retry
+        xil_printf("[I2C] Send failed (sent %d/%d), retry %d\r\n", sent, len, retries);
+        I2C_ResetBus(BaseAddress);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    
+    return false;
+}
+
+/**
+ * @brief Safe I2C receive with timeout and error recovery
+ */
+bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option) {
+    int retries = 3;
+    
+    while (retries-- > 0) {
+        // Check if bus is stuck
+        int timeout = 50;
+        while (!I2C_CheckBusIdle(BaseAddress) && timeout-- > 0) {
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+        
+        if (timeout <= 0) {
+            xil_printf("[I2C] Bus stuck before recv, resetting...\r\n");
+            I2C_ResetBus(BaseAddress);
+            continue;
+        }
+        
+        // Clear pending interrupts
+        XIic_WriteReg(BaseAddress, XIIC_IISR_OFFSET, 0xFFFFFFFF);
+        
+        // Attempt receive
+        int received = XIic_Recv(BaseAddress, DevAddr, data, len, option);
+        
+        if (received == len) {
+            // Wait for completion with timeout
+            timeout = 100;
+            while (timeout-- > 0) {
+                u16 StatusReg = XIic_ReadReg(BaseAddress, XIIC_SR_REG_OFFSET);
+                if (!(StatusReg & XIIC_SR_BUS_BUSY_MASK)) {
+                    // Check for errors
+                    u16 IrqReg = XIic_ReadReg(BaseAddress, XIIC_IISR_OFFSET);
+                    if (IrqReg & (XIIC_INTR_ARB_LOST_MASK | XIIC_INTR_TX_ERROR_MASK)) {
+                        XIic_WriteReg(BaseAddress, XIIC_IISR_OFFSET, IrqReg);
+                        xil_printf("[I2C] Recv error detected\r\n");
+                        break;
+                    }
+                    return true; // Success!
+                }
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
+            
+            xil_printf("[I2C] Recv timeout\r\n");
+        }
+        
+        // Failed - reset and retry
+        xil_printf("[I2C] Recv failed (got %d/%d), retry %d\r\n", received, len, retries);
+        I2C_ResetBus(BaseAddress);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    
+    return false;
+}
+
 uint8_t ADDRESS_TO_CHECK[] = {INA740_ADDR,TMP102_ADDR};
 
 //Function prototypes
@@ -162,7 +319,10 @@ void checkIICchannel(UINTPTR BaseAddress)
 
 void setIICmux(UINTPTR BaseAddress, uint8_t index)
 {
-    XIic_Send(BaseAddress, TCA9548ARGER_ADDR, &index, 1, XIIC_STOP);
+    if (!I2C_SafeSend(BaseAddress, TCA9548ARGER_ADDR, &index, 1, XIIC_STOP))
+    {
+        xil_printf("Error setting IIC mux\r\n");
+    }
 }
 
 
@@ -176,7 +336,11 @@ bool checkPresence(UINTPTR BaseAddress, uint8_t deviceAddress)
 
     //Enviamos una lectura
     //XIic_Send(BaseAddress, deviceAddress, &dummy, 1, XIIC_STOP);
-    XIic_Recv(BaseAddress,deviceAddress,&dummy,1,XIIC_STOP);
+    if (XIic_Recv(BaseAddress,deviceAddress,&dummy,1,XIIC_STOP) != 1)
+    {
+        xil_printf("error on XIic_Recv to address 0x%02X\r\n", deviceAddress);
+        return false;
+    }   
     
     u16 StatusReg;
     int timeout = 100;
@@ -587,3 +751,4 @@ int32_t ADS1115_RawToMillivolts(int16_t raw, uint16_t pga)
     // Convert to millivolts
     return (raw * lsb_uv) / 1000;
 }
+

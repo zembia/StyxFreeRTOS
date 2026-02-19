@@ -67,4 +67,11 @@ bool PCA9535_SetPins0to11(UINTPTR BaseAddress, uint8_t DevAddr, bool Value);
 void enableOutputs(UINTPTR);
 void disableOutputs(UINTPTR);
 void configureOutputs(UINTPTR);
+
+// I2C bus recovery functions
+bool I2C_CheckBusIdle(UINTPTR BaseAddress);
+void I2C_ResetBus(UINTPTR BaseAddress);
+bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option);
+bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option);
+
 #endif

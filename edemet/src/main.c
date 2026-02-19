@@ -151,6 +151,7 @@ void vTaskHello(void *pvParameters)
 void vTaskMagnet(void *pvParameters)
 {
     
+    
     // Extract the configuration
     task_manager_t *cfg = (task_manager_t *)pvParameters;
     operation_control_t *op = cfg->op;
@@ -170,10 +171,8 @@ void vTaskMagnet(void *pvParameters)
     // checkAllI2CDevices();
 
     // for (int i = 0; i < 5; i++) {        
-    for (int ii = 0; ii < 1; ii++) {        
-        int i = 4;
-        initReadADC(baseAddr, i, ADS1115_MAGNETIC_FIELD);        
-    }
+    //     initReadADC(baseAddr, i, ADS1115_MAGNETIC_FIELD);        
+    // }
 
     // 3. Signal the next task in the chain
     if (cfg->signalSem != NULL) {
@@ -187,16 +186,24 @@ void vTaskMagnet(void *pvParameters)
     if (baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR) {
         group_index = 0;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_B_BASEADDR) {
+        return;
         group_index = 1;
-    } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_C_BASEADDR) {
+    } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_C_BASEADDR ) {
+        return;
         group_index = 2;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_D_BASEADDR) {
+        return;
         group_index = 3;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_E_BASEADDR) {
+        return;
         group_index = 4;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_F_BASEADDR) {
+        return;
         group_index = 5;
     }
+    I2C_ResetBus(baseAddr);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    //XIic_IntrGlobalDisable(baseAddr);
 
     /*
     while(1) {
@@ -234,31 +241,51 @@ void vTaskMagnet(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
     */
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2)); 
+    TickType_t lastWake2 = xTaskGetTickCount();
 
+    uint32_t startTime;
+    uint32_t endTime;
+    uint32_t difftime1 = 0, difftime2 = 0, difftime3 = 0;
+
+    uint8_t counter=0;
     while (1)
-    {        
-        if (group_index != 0) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            continue;
-        }
+    {   
+        vTaskDelayUntil(&lastWake2, pdMS_TO_TICKS(10)); 
+                     
+        //xil_printf("[DBG] Loop start\r\n");
+        startTime = xTaskGetTickCount();
+        // Start EM conversion of magnetic field (ADC)
+        //xil_printf("[DBG] Starting mag conversions\r\n");
+        for (int i=0; i < 5; i++) {        
+            initReadADC(baseAddr, 4, ADS1115_MAGNETIC_FIELD); 
+        }        
+        difftime1 += xTaskGetTickCount() - startTime;
+
+        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2));
+        //xil_printf("[DBG] After delay 1\r\n");
+
+        startTime = xTaskGetTickCount();
         // ======== STEP 1 ========
         // Read EM magnetic field (ADC)
-        // for (int ii = 0; ii < 5; ii++) {
-        for (int ii = 0; ii < 1; ii++) {
-            int i = 4;
-            op->em[group_index*5+i].last_em_measure = readADC(baseAddr, i);
+        //xil_printf("[DBG] Reading mag fields\r\n");
+
+        for (int i=0; i < 5; i++) {
+            //xil_printf("[DBG] Reading mag %d\r\n", i);
+            op->em[group_index*5+i].last_em_measure = readADC(baseAddr, 4);
         }
 
         // Start EM conversion of temp (ADC)
-        // for (int ii = 0; ii < 5; ii++) {
-        for (int ii = 0; ii < 1; ii++) {
-            int i = 4;
-            initReadADC(baseAddr, i, ADS1115_TEMP1); 
+        //xil_printf("[DBG] Starting temp conversions\r\n");
+        for (int i=0; i < 5; i++) {            
+            initReadADC(baseAddr, 4, ADS1115_TEMP1); 
         }
-
+        difftime2 += xTaskGetTickCount() - startTime;
 
         vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2)); 
+        //xil_printf("[DBG] After delay 2\r\n");
 
+        startTime = xTaskGetTickCount();
         // ======== STEP 2 ========
         // Just once
         if (group_index == 0) {
@@ -268,37 +295,59 @@ void vTaskMagnet(void *pvParameters)
         }
 
         // Read EM power (INA)
-        // for (int ii = 0; ii < 5; ii++) {
-        for (int ii = 0; ii < 1; ii++) {
-            int i = 4;
+        //xil_printf("[DBG] Reading power\r\n");
+        for (int i=0; i < 5; i++) {
+            i=4;
+            //xil_printf("[DBG] Power sensor %d - setting mux\r\n", i);
             // Read EM power (INA)
             // Select baseAddr i2c_expander port
             setIICmux(baseAddr, 1 << i);
+            vTaskDelay(pdMS_TO_TICKS(1)); // Small delay after mux switch
 
-            uint8_t buf[3] = {0x08, 0x00, 0x00}; // Should be 0x08
-            // Set the pointer to voltage register            
-            XIic_Send(baseAddr, 0x40, buf, 1, XIIC_STOP);
+            //xil_printf("[DBG] Power sensor %d - sending cmd\r\n", i);
+            uint8_t buf[3] = {0x08, 0x00, 0x00};
+            // Set the pointer to power register
+            if (!I2C_SafeSend(baseAddr, 0x40, buf, 1, XIIC_STOP)) {
+                xil_printf("[ERROR] Failed to set INA register for EM %d\r\n", i);
+                op->em[group_index*5+i].last_em_pwr = 0;
+                continue;
+            }
             
+            //xil_printf("[DBG] Power sensor %d - receiving data\r\n", i);
             // Read voltage
-            XIic_Recv(baseAddr, 0x40, buf, 3, XIIC_STOP); // Should be 3 bytes
+            if (!I2C_SafeRecv(baseAddr, 0x40, buf, 3, XIIC_STOP)) {
+                xil_printf("[ERROR] Failed to read INA data for EM %d\r\n", i);
+                op->em[group_index*5+i].last_em_pwr = 0;
+                continue;
+            }
 
             // Save EM power
             op->em[group_index*5+i].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;
+            //xil_printf("[DBG] Power sensor %d - done\r\n", i);
         }
 
         // Read EM temperature (ADC)
-        for (int ii = 0; ii < 1; ii++) {
-            int i = 4;
-            op->em[group_index*5+i].last_em_temp = readADC(baseAddr, i);
-        }
-        
-        // Start EM conversion of magnetic field (ADC)
-        for (int ii = 0; ii < 5; ii++) {        
-            int i = 4;
-            initReadADC(baseAddr, i, ADS1115_MAGNETIC_FIELD); 
-        }
+        //xil_printf("[DBG] Reading temps\r\n");
+        for (int i=0; i < 5; i++) {        
+            //xil_printf("[DBG] Reading temp %d\r\n", i);
+            op->em[group_index*5+i].last_em_temp = readADC(baseAddr, 4);
+        }        
+        difftime3 += xTaskGetTickCount() - startTime;
 
-        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(500));
+
+        if (++counter >=32)
+        {
+            xil_printf("------\r\n");
+            for (int i=0; i < 5; i++) {
+                xil_printf("%d: %d // %d // %d\r\n", group_index, op->em[group_index*5+i].last_em_temp, op->em[group_index*5+i].last_em_pwr, op->em[group_index*5+i].last_em_measure);
+            }
+
+            printf("DiffTime %d // %d // %d\r\n", difftime1, difftime2, difftime3); 
+            difftime1 = 0;
+            difftime2 = 0;
+            difftime3 = 0;
+            counter = 0;
+        }
 
     }
 }
@@ -341,7 +390,7 @@ void vTaskIoExp(void *pvParameters)
             continue;
         }
 
-        prevStatus = op->outputsStatus;
+        prevStatus = op->outputsStatus; 
         if (prevStatus)
         {
             enableOutputs(baseAddr);
@@ -657,7 +706,8 @@ void vTaskMain(void *pvParameters)
 
 void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel) {
     
-    setIICmux(baseAddr, 1 << i2c_index);    
+    setIICmux(baseAddr, 1 << i2c_index);
+    //vTaskDelay(pdMS_TO_TICKS(2)); // Delay after mux switch
 
     // Build configuration (per datasheet Table 9)
     uint16_t config = ADS1115_OS_SINGLE |       // Start single conversion
@@ -675,7 +725,9 @@ void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel) {
     write_buf[1] = config >> 8; // 0xC3; // MSB of config
     write_buf[2] = config ; // 0x83; // LSB of config
 
-    XIic_Send(baseAddr, 0x48, write_buf, 3, XIIC_STOP);
+    if (!I2C_SafeSend(baseAddr, 0x48, write_buf, 3, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to send ADC config\r\n");
+    }
 }
 
 int16_t readADC(UINTPTR baseAddr, int8_t i2c_index) {
@@ -684,9 +736,16 @@ int16_t readADC(UINTPTR baseAddr, int8_t i2c_index) {
 
     // Read Conversion Register (register 0x00)
     uint8_t reg = 0x00;    
-    XIic_Send(baseAddr, 0x48, &reg, 1, XIIC_STOP);
+    if (!I2C_SafeSend(baseAddr, 0x48, &reg, 1, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to set ADC register pointer\r\n");
+        return 0;
+    }
+    
     uint8_t buf[2];
-    XIic_Recv(baseAddr, 0x48, buf, 2, XIIC_STOP);
+    if (!I2C_SafeRecv(baseAddr, 0x48, buf, 2, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to read ADC data\r\n");
+        return 0;
+    }
 
     // 1. Combine bytes into a temporary 16-bit integer
     int16_t rawValue = (int16_t)((buf[0] << 8) | buf[1]);
@@ -774,7 +833,7 @@ void vTaskPwm(void *pvParameters)
                     if (decimal_part < 0)
                         decimal_part = -decimal_part; // Make absolute
 
-                    if (i >= 2 && i < 7)
+                    if (i >= 2 && i < 1)//7)
                     {
                         
                         xil_printf("%3d PWM %d: %d (%d.%02d%%) %d %d\r\n",
@@ -856,7 +915,7 @@ void vTaskPwm(void *pvParameters)
                     if (decimal_part < 0)
                         decimal_part = -decimal_part; // Make absolute
 
-                    if (i >= 2 && i < 7)
+                    if (i >= 2 && i < 1)//7)
                     {
                         
                         xil_printf("%3d PWM %d: %d (%d.%02d%%) %d %d\r\n",
@@ -1017,27 +1076,27 @@ int main(void)
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskIoExp2\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetA" , 192  , &configC, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetA" , 1024  , &configC, tskIDLE_PRIORITY + 1, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetA\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetB" , 192  , &configD, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetB" , 1024  , &configD, tskIDLE_PRIORITY + 1, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetB\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetC" , 192  , &configE, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetC" , 1024  , &configE, tskIDLE_PRIORITY + 1, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetC\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetD" , 192  , &configF, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetD" , 1024  , &configF, tskIDLE_PRIORITY + 1, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetD\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetE" , 192  , &configG, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetE" , 1024  , &configG, tskIDLE_PRIORITY + 1, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetE\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetF" , 192  , &configH, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetF" , 1024  , &configH, tskIDLE_PRIORITY + 1, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetF\r\n");
     }
