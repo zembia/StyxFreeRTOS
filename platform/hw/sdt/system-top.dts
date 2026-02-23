@@ -46,9 +46,9 @@
 		i2c3 = &I2C_MAGNET_PORTS_AXI_IIC_E;
 		serial1 = &coresight;
 		i2c4 = &I2C_MAGNET_PORTS_AXI_IIC_F;
-		i2c5 = &axi_iic_current;
-		i2c6 = &axi_iic_ioexp_1;
-		i2c7 = &axi_iic_ioexp_2;
+		i2c5 = &I2C_MAGNET_PORTS_axi_iic_current;
+		i2c6 = &I2C_MAGNET_PORTS_axi_iic_ioexp_1;
+		i2c7 = &I2C_MAGNET_PORTS_axi_iic_ioexp_2;
 		i2c8 = &I2C_MAGNET_PORTS_AXI_IIC_A;
 		spi0 = &qspi;
 		i2c0 = &I2C_MAGNET_PORTS_AXI_IIC_B;
@@ -60,18 +60,6 @@
 			      <0x00100000 &ps7_ddr_0_memory 0x00100000 0xFF00000>, 
 			      <0x0 &ps7_ram_0_memory 0x0 0x30000>, 
 			      <0xffff0000 &ps7_ram_1_memory 0xffff0000 0xfe00>, 
-			      <0x41200000 &axi_gpio_0 0x41200000 0x10000>, 
-			      <0x41210000 &axi_gpio_1 0x41210000 0x10000>, 
-			      <0x41220000 &axi_gpio_btn_led 0x41220000 0x10000>, 
-			      <0x41600000 &I2C_MAGNET_PORTS_AXI_IIC_A 0x41600000 0x10000>, 
-			      <0x41610000 &I2C_MAGNET_PORTS_AXI_IIC_B 0x41610000 0x10000>, 
-			      <0x41620000 &I2C_MAGNET_PORTS_AXI_IIC_C 0x41620000 0x10000>, 
-			      <0x41630000 &I2C_MAGNET_PORTS_AXI_IIC_D 0x41630000 0x10000>, 
-			      <0x41640000 &I2C_MAGNET_PORTS_AXI_IIC_E 0x41640000 0x10000>, 
-			      <0x41650000 &I2C_MAGNET_PORTS_AXI_IIC_F 0x41650000 0x10000>, 
-			      <0x41660000 &axi_iic_ioexp_1 0x41660000 0x10000>, 
-			      <0x41670000 &axi_iic_ioexp_2 0x41670000 0x10000>, 
-			      <0x41680000 &axi_iic_current 0x41680000 0x10000>, 
 			      <0x43c00000 &PWM_MagnetPWMController_0 0x43c00000 0x10000>, 
 			      <0x43c10000 &PWM_MagnetPWMController_1 0x43c10000 0x10000>, 
 			      <0x43c20000 &PWM_MagnetPWMController_2 0x43c20000 0x10000>, 
@@ -102,7 +90,19 @@
 			      <0x43db0000 &PWM_MagnetPWMController_27 0x43db0000 0x10000>, 
 			      <0x43dc0000 &PWM_MagnetPWMController_28 0x43dc0000 0x10000>, 
 			      <0x43dd0000 &PWM_MagnetPWMController_29 0x43dd0000 0x10000>, 
-			      <0x43de0000 &WS2812B_driver_0 0x43de0000 0x10000>, 
+			      <0x81200000 &axi_gpio_0 0x81200000 0x10000>, 
+			      <0x81210000 &axi_gpio_1 0x81210000 0x10000>, 
+			      <0x81220000 &axi_gpio_btn_led 0x81220000 0x10000>, 
+			      <0x81600000 &I2C_MAGNET_PORTS_axi_iic_current 0x81600000 0x10000>, 
+			      <0x81610000 &I2C_MAGNET_PORTS_axi_iic_ioexp_1 0x81610000 0x10000>, 
+			      <0x81620000 &I2C_MAGNET_PORTS_axi_iic_ioexp_2 0x81620000 0x10000>, 
+			      <0x81630000 &I2C_MAGNET_PORTS_AXI_IIC_A 0x81630000 0x10000>, 
+			      <0x81640000 &I2C_MAGNET_PORTS_AXI_IIC_B 0x81640000 0x10000>, 
+			      <0x81650000 &I2C_MAGNET_PORTS_AXI_IIC_C 0x81650000 0x10000>, 
+			      <0x81660000 &I2C_MAGNET_PORTS_AXI_IIC_D 0x81660000 0x10000>, 
+			      <0x81670000 &I2C_MAGNET_PORTS_AXI_IIC_E 0x81670000 0x10000>, 
+			      <0x81680000 &I2C_MAGNET_PORTS_AXI_IIC_F 0x81680000 0x10000>, 
+			      <0x83c00000 &WS2812B_driver_0 0x83c00000 0x10000>, 
 			      <0xf8008000 &ps7_afi_0 0xf8008000 0x1000>, 
 			      <0xf8009000 &ps7_afi_1 0xf8009000 0x1000>, 
 			      <0xf800a000 &ps7_afi_2 0xf800a000 0x1000>, 

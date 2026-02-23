@@ -39,7 +39,7 @@ static void W5100_ResetSS(W5100_Handle *handle);
 static W5100_ChipType W5100_DetectChip(W5100_Handle *handle);
 static void DHCP_Task(void *pvParameters);
 static void TCP_Server_Task(void *pvParameters);
-
+void calculateCRC(uint8_t *buffer, uint16_t length);
 #define W5100_SPI_CLK_HZ 70000000 // 10 MHz SPI clock
 
 __attribute__((section(".wave_buffers")))
@@ -128,10 +128,6 @@ void ethernetInit(operation_control_t *op) {
 
   /* Configure network parameters */
   W5100_SetMACAddress(&w5100_handle, mac_addr);
-  /*W5100_SetIPAddress(&w5100_handle, ip_addr);
-  W5100_SetGatewayIP(&w5100_handle, gateway);
-  W5100_SetSubnetMask(&w5100_handle, subnet);
-  */
 
   /* Print configuration */
   uint8_t read_mac[6], read_ip[4], read_gw[4], read_subnet[4];
@@ -159,11 +155,8 @@ void ethernetInit(operation_control_t *op) {
   if (status != pdPASS) {
     xil_printf("Failed to create DHCP task\r\n");
   }
-  // xTaskCreate(DHCP_Task, "DHCP", 2048, NULL, tskIDLE_PRIORITY + 2, NULL);
   status = xTaskCreate(TCP_Server_Task, "TCP_Server", 8192, op,
                        tskIDLE_PRIORITY + 2, NULL);
-  // xTaskCreate(TCP_Server_Task, "TCP_Server", 2048, op, tskIDLE_PRIORITY + 1,
-  // NULL);
 
   if (status != pdPASS) {
     xil_printf("Failed to create TCP Server task\r\n");
@@ -227,18 +220,26 @@ int W5100_Init(W5100_Handle *handle, W5100_Config *config) {
     prescaler++;
     actual_clk = input_clk / (2 << prescaler);
   }
+  
+  status = XSpiPs_SetClkPrescaler(config->spi_instance,
+                                  XSPIPS_CLK_PRESCALE_8);  
   /*
   status = XSpiPs_SetClkPrescaler(config->spi_instance,
-                                  XSPIPS_CLK_PRESCALE_256);  */
+                                  XSPIPS_CLK_PRESCALE_8); */
 
+  /*                                
   status = XSpiPs_SetClkPrescaler(config->spi_instance,
-                                  XSPIPS_CLK_PRESCALE_8); /* Prescaler format */
+                                  XSPIPS_CLK_PRESCALE_16); */
   // XSPIPS_CLK_PRESCALE_32);  /* Prescaler format */
   if (status != XST_SUCCESS) {
     xil_printf("W5100: Failed to set SPI clock prescaler\r\n");
     return status;
   }
 
+  u8 DelayNss,DelayBtwn,DelayAfter,DelayInit;
+  XSpiPs_GetDelays(config->spi_instance,&DelayNss,&DelayBtwn,&DelayAfter,&DelayInit);
+  xil_printf("SPI Delays - NSS: %d, Between: %d, After: %d, Init: %d\r\n",DelayNss,DelayBtwn,DelayAfter,DelayInit);
+  XSpiPs_SetDelays(config->spi_instance,4,4,4,4);
   /* Software reset */
   W5100_SoftReset(handle);
 
@@ -282,7 +283,7 @@ int W5100_SoftReset(W5100_Handle *handle) {
 
   /* Wait for mode register to clear */
   while (W5100_ReadByte(handle, W5100_MR) != 0x00) {
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(2));
     if (++count > 20) {
       xil_printf("W5100: Soft reset timeout\r\n");
       return XST_FAILURE;
@@ -1119,7 +1120,7 @@ static void TCP_Server_Task(void *pvParameters) {
   uint16_t server_port = 5005;
   uint16_t base = W5100_S0_BASE + (sock * 0x0100);
   uint8_t recv_buf[1500];
-  uint8_t response[SEND_PACKET_MAX_SIZE];
+  uint8_t response[SEND_PACKET_MAX_SIZE+CRC_LEN];
   uint8_t response_length = 0;
   uint32_t tmp_wrapper_pkt_index = 0;
   uint32_t wrapper_pkt_index = 0;
@@ -1139,6 +1140,8 @@ static void TCP_Server_Task(void *pvParameters) {
   uint8_t em_array_idx;
 
   uint32_t startTime,endTime;
+
+  
 
 
   xil_printf("TCP Server: Waiting for DHCP bound\r\n");
@@ -1165,7 +1168,8 @@ static void TCP_Server_Task(void *pvParameters) {
   W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_LISTEN);
 
   xil_printf("TCP Server: Listening for connections...\r\n");
-
+  uint16_t sum = 0xFFFF;
+  uint16_t calc_crc;
   while (1) {
 
     uint8_t status = W5100_ReadByte(&w5100_handle, base + W5100_Sn_SR);
@@ -1186,27 +1190,47 @@ static void TCP_Server_Task(void *pvParameters) {
           // could be a problem and should be handle differently
           recv_size = sizeof(recv_buf) - 1;
         }
-
+        
         W5100_RecvData(&w5100_handle, sock, recv_buf, recv_size);
         W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_RECV);
-
-        // recv_buf[recv_size] = '\0';
-        cmd = ((uint16_t)recv_buf[0] << 8) | recv_buf[1];
+        
+        sum = 0xFFFF;
+        for (int i=0;i<recv_size-2;i++)
+        {
+          sum-=recv_buf[i];
+        }
+        calc_crc = (recv_buf[recv_size-2]<<8)|(recv_buf[recv_size-1]);
+        if (sum != calc_crc)
+        {
+          cmd = 0; //nullify command
+        }
+        else
+        {
+          cmd = ((uint16_t)recv_buf[0] << 8) | recv_buf[1];
+        }
+        
+        //cmd = ((uint16_t)recv_buf[0] << 8) | recv_buf[1];
 
         // xil_printf("Received: %s\r\n", recv_buf);
 
         switch (cmd) {
-        case CMD_CODE_PLAY:
-          // PLAY
-          xil_printf("Play cmd\r\n");
-          xSemaphoreTake(op->mutex, portMAX_DELAY);
-          op->cmd = CMD_PLAY;
-          xSemaphoreGive(op->mutex);
-          response[0] = (cmd & 0xFF00) >> 8;
-          response[1] = (cmd & 0x00FF);
-          response[2] = RESPONSE_SUCCESS;
-          response_length = 3;
-          break;
+          case 0:
+            xil_printf("CRC ERROR!\r\n");
+            response[0] = 0;
+            response[1] = 0;
+            response[2] = RESPONSE_ERROR_INVALID_CRC;
+            response_length = 3;
+          case CMD_CODE_PLAY:
+            // PLAY
+            xil_printf("Play cmd\r\n");
+            xSemaphoreTake(op->mutex, portMAX_DELAY);
+            op->cmd = CMD_PLAY;
+            xSemaphoreGive(op->mutex);
+            response[0] = (cmd & 0xFF00) >> 8;
+            response[1] = (cmd & 0x00FF);
+            response[2] = RESPONSE_SUCCESS;
+            response_length = 3;
+            break;
 
         case CMD_CODE_PAUSE:
           // PAUSE
@@ -1443,8 +1467,9 @@ static void TCP_Server_Task(void *pvParameters) {
 
         // Echo response
         if (response_length > 0) {
+          calculateCRC(response,response_length);
           W5100_SendData(&w5100_handle, sock, (uint8_t *)response,
-                         response_length);
+                         response_length+2);
           W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_SEND);
         }
       }
@@ -1475,9 +1500,11 @@ static void TCP_Server_Task(void *pvParameters) {
         }
 
         // Send response
-        W5100_SendData(&w5100_handle, sock, response, response_length);
-        W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_SEND);
-
+        if (response_length != 0) {
+          calculateCRC(response,response_length);
+          W5100_SendData(&w5100_handle, sock, response, response_length+2);
+          W5100_ExecCmdSn(&w5100_handle, sock, W5100_SOCK_SEND);
+        }
         // Reset wrapper state for next transfer
         wrapped_cmd_available = false;
         wrapper_pkt_index = 0;
@@ -1625,16 +1652,12 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
 
 
 
-    if (start>end)
+    if ((start>end) /*&& (start != 0xFFFFFFFF)*/)
     {
         buffer_reply[2] = RESPONSE_ERROR_INVALID_TIME;
         return 3;
     }
-    else if (start != 0xFFFFFFFF)
-    {
-        buffer_reply[2] = RESPONSE_SUCCESS;
-        return 3;
-    }
+    
 
     if (realEndIndex>  op->generalPlaybackIndex)
     {
@@ -1771,4 +1794,17 @@ uint16_t buildPacketEMconfig(uint32_t start, uint32_t end, uint8_t em_ring_index
         #endif
     }
     return 7+((realEndIndex-realStartIndex)*13+7)/8; //Ceiling of bits to bytes
+}
+
+
+void calculateCRC(uint8_t *buffer, uint16_t length)
+{
+  int i;
+  uint16_t SUM = 0xFFFF;
+  for (i=0;i<length;i++)
+  {
+    SUM-=buffer[i];
+  }
+  buffer[length] = (SUM&0xFF00)>>8;
+  buffer[length+1] = (SUM&0x00FF);
 }

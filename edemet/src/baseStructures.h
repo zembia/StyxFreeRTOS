@@ -43,6 +43,7 @@
 #define RESPONSE_ERROR_VECTOR_TOO_LARGE       0x05
 #define RESPONSE_ERROR_ALLOCATION_FAILED      0x06
 #define RESPONSE_ERROR_INVALID_TIME           0x07
+#define RESPONSE_ERROR_INVALID_CRC           0x08
 
 
 #define CFG_EM_HEADER_LEN 19
@@ -70,7 +71,8 @@ static inline void put11s(uint8_t *buf, uint32_t index, int16_t value);
 int16_t get11s(const uint8_t *buf, uint32_t index);
 
 
-#define SEND_PACKET_MAX_SIZE 1460
+#define CRC_LEN 2
+#define SEND_PACKET_MAX_SIZE 1460-CRC_LEN
 
 typedef enum
 {

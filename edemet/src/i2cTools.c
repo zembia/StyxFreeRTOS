@@ -224,7 +224,7 @@ void checkAllI2CDevices(void)
     
     for (i=0;i<(int)sizeof(ioexp_addr);i++)
     {
-        present = checkPresence(XPAR_AXI_IIC_IOEXP_1_BASEADDR,ioexp_addr[i]);
+        present = checkPresence(XPAR_I2C_MAGNET_PORTS_AXI_IIC_IOEXP_1_BASEADDR,ioexp_addr[i]);
         if (present){
             printf("\t%02X present\r\n",ioexp_addr[i]);
         }else {
@@ -237,7 +237,7 @@ void checkAllI2CDevices(void)
     
     for (i=0;i<(int)sizeof(ioexp_addr);i++)
     {
-        present = checkPresence(XPAR_AXI_IIC_IOEXP_2_BASEADDR,ioexp_addr[i]);
+        present = checkPresence(XPAR_I2C_MAGNET_PORTS_AXI_IIC_IOEXP_2_BASEADDR,ioexp_addr[i]);
         if (present){
             printf("\t%02X present\r\n",ioexp_addr[i]);
         }else {
@@ -251,12 +251,12 @@ void checkAllI2CDevices(void)
     printf("Init setting as outputs\r\n");
     bool res;
     for (i = 0; i < (int)sizeof(ioexp_addr); i++) {
-        res = PCA9535_SetPins0to11_Output(XPAR_AXI_IIC_IOEXP_1_BASEADDR, ioexp_addr[i]);
+        res = PCA9535_SetPins0to11_Output(XPAR_I2C_MAGNET_PORTS_AXI_IIC_IOEXP_1_BASEADDR, ioexp_addr[i]);
         if (!res) {
             printf("Error setting pin as output\r\n");
             break;
         }
-        res = PCA9535_SetPins0to11_Output(XPAR_AXI_IIC_IOEXP_2_BASEADDR, ioexp_addr[i]);
+        res = PCA9535_SetPins0to11_Output(XPAR_I2C_MAGNET_PORTS_AXI_IIC_IOEXP_2_BASEADDR, ioexp_addr[i]);
         if (!res) {
             printf("Error setting pin as output\r\n");
             break;

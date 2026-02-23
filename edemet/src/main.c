@@ -33,7 +33,7 @@ const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_P
                             };
 
 void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B);
-void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel);
+void initReadADC(UINTPTR baseAddr, uint16_t channel);
 
 
 
@@ -42,7 +42,7 @@ void vTaskPwm(void *pvParameters);
 void processCommand(char *);
 void setPwmMode(uint8_t id, bool mode);
 int16_t get13s(const uint8_t *buf, uint32_t index);
-int16_t readADC(UINTPTR baseAddr, int8_t i2c_index);
+int16_t readADC(UINTPTR baseAddr);
 void read_all_em_analog_inputs(void);
 XGpio pwmEnableGpio;
 
@@ -205,42 +205,7 @@ void vTaskMagnet(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(10));
     //XIic_IntrGlobalDisable(baseAddr);
 
-    /*
-    while(1) {
-        int i = 4;
-        baseAddr = XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR;    
-        initReadADC(baseAddr, i, ADS1115_MAGNETIC_FIELD);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        op->em[group_index*5+i].last_em_measure = readADC(baseAddr, i);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        
-        initReadADC(baseAddr, i, ADS1115_TEMP1); 
-        vTaskDelay(pdMS_TO_TICKS(100));
-        
-        op->em[group_index*5+i].last_em_temp = readADC(baseAddr, i);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        // Read EM power (INA)
-        // Select baseAddr i2c_expander port
-        setIICmux(baseAddr, 1 << i);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        uint8_t buf[3] = {0x08, 0x00, 0x00}; // Should be 0x08
-        // Set the pointer to voltage register            
-        XIic_Send(baseAddr, 0x40, buf, 1, XIIC_STOP);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        
-        // Read voltage
-        XIic_Recv(baseAddr, 0x40, buf, 3, XIIC_STOP); // Should be 3 bytes        
-
-        // Save EM power
-        op->em[group_index*5+i].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;        
-        
-        xil_printf("EM %d: mag=%d, temp=%d, pwr=%d\r\n", i, op->em[group_index*5+i].last_em_measure, op->em[group_index*5+i].last_em_temp, op->em[group_index*5+i].last_em_pwr);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-    */
+  
     vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2)); 
     TickType_t lastWake2 = xTaskGetTickCount();
 
@@ -257,59 +222,20 @@ void vTaskMagnet(void *pvParameters)
         startTime = xTaskGetTickCount();
         // Start EM conversion of magnetic field (ADC)
         //xil_printf("[DBG] Starting mag conversions\r\n");
-        for (int i=0; i < 5; i++) {        
-            initReadADC(baseAddr, 4, ADS1115_MAGNETIC_FIELD); 
-        }        
-        difftime1 += xTaskGetTickCount() - startTime;
-
-        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2));
-        //xil_printf("[DBG] After delay 1\r\n");
-
-        startTime = xTaskGetTickCount();
-        // ======== STEP 1 ========
-        // Read EM magnetic field (ADC)
-        //xil_printf("[DBG] Reading mag fields\r\n");
-
-        for (int i=0; i < 5; i++) {
-            //xil_printf("[DBG] Reading mag %d\r\n", i);
-            op->em[group_index*5+i].last_em_measure = readADC(baseAddr, 4);
-        }
-
-        // Start EM conversion of temp (ADC)
-        //xil_printf("[DBG] Starting temp conversions\r\n");
-        for (int i=0; i < 5; i++) {            
-            initReadADC(baseAddr, 4, ADS1115_TEMP1); 
-        }
-        difftime2 += xTaskGetTickCount() - startTime;
-
-        vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2)); 
-        //xil_printf("[DBG] After delay 2\r\n");
-
-        startTime = xTaskGetTickCount();
-        // ======== STEP 2 ========
-        // Just once
-        if (group_index == 0) {
-            // Read CFLE power (ADC)
-            // TODO
-            // op->last_cfle_pwr = XXXX;
-        }
-
-        // Read EM power (INA)
-        //xil_printf("[DBG] Reading power\r\n");
-        for (int i=0; i < 5; i++) {
-            i=4;
-            //xil_printf("[DBG] Power sensor %d - setting mux\r\n", i);
-            // Read EM power (INA)
-            // Select baseAddr i2c_expander port
+        for (int ii=0; ii < 5; ii++) {
+            int i = 4;
             setIICmux(baseAddr, 1 << i);
-            vTaskDelay(pdMS_TO_TICKS(1)); // Small delay after mux switch
-
-            //xil_printf("[DBG] Power sensor %d - sending cmd\r\n", i);
+            //Reading temperature converted in last loop
+            op->em[group_index*5+ii].last_em_temp = readADC(baseAddr);
+            //initing magnetic field conversion
+            initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
+            
+            //Reading INA
             uint8_t buf[3] = {0x08, 0x00, 0x00};
             // Set the pointer to power register
             if (!I2C_SafeSend(baseAddr, 0x40, buf, 1, XIIC_STOP)) {
                 xil_printf("[ERROR] Failed to set INA register for EM %d\r\n", i);
-                op->em[group_index*5+i].last_em_pwr = 0;
+                op->em[group_index*5+ii].last_em_pwr = 0;
                 continue;
             }
             
@@ -317,36 +243,31 @@ void vTaskMagnet(void *pvParameters)
             // Read voltage
             if (!I2C_SafeRecv(baseAddr, 0x40, buf, 3, XIIC_STOP)) {
                 xil_printf("[ERROR] Failed to read INA data for EM %d\r\n", i);
-                op->em[group_index*5+i].last_em_pwr = 0;
+                op->em[group_index*5+ii].last_em_pwr = 0;
                 continue;
             }
-
             // Save EM power
-            op->em[group_index*5+i].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;
-            //xil_printf("[DBG] Power sensor %d - done\r\n", i);
+            op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;
+        }
+        
+        
+        // Read EM magnetic field (ADC) and setup temp read for next loop    
+
+        for (int ii=0; ii < 5; ii++) {
+            int i = 4;
+            setIICmux(baseAddr, 1 << i);
+            op->em[group_index*5+ii].last_em_measure = readADC(baseAddr);
+            initReadADC(baseAddr, ADS1115_TEMP1); 
         }
 
-        // Read EM temperature (ADC)
-        //xil_printf("[DBG] Reading temps\r\n");
-        for (int i=0; i < 5; i++) {        
-            //xil_printf("[DBG] Reading temp %d\r\n", i);
-            op->em[group_index*5+i].last_em_temp = readADC(baseAddr, 4);
-        }        
-        difftime3 += xTaskGetTickCount() - startTime;
 
-
-        if (++counter >=32)
+        if (++counter >=128)
         {
             xil_printf("------\r\n");
             for (int i=0; i < 5; i++) {
                 xil_printf("%d: %d // %d // %d\r\n", group_index, op->em[group_index*5+i].last_em_temp, op->em[group_index*5+i].last_em_pwr, op->em[group_index*5+i].last_em_measure);
             }
-
-            printf("DiffTime %d // %d // %d\r\n", difftime1, difftime2, difftime3); 
-            difftime1 = 0;
-            difftime2 = 0;
-            difftime3 = 0;
-            counter = 0;
+            counter=0;
         }
 
     }
@@ -374,7 +295,8 @@ void vTaskIoExp(void *pvParameters)
     xil_printf("Starting %s at address 0x%08x\r\n", pcTaskName, baseAddr);
 
     configureOutputs(baseAddr);
-    disableOutputs(baseAddr);
+    //disableOutputs(baseAddr);
+    enableOutputs(baseAddr);
     
     // 3. Signal the next task in the chain
     if (cfg->signalSem != NULL) {
@@ -704,9 +626,9 @@ void vTaskMain(void *pvParameters)
     }
 }
 
-void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel) {
+void initReadADC(UINTPTR baseAddr, uint16_t channel) {
     
-    setIICmux(baseAddr, 1 << i2c_index);
+    
     //vTaskDelay(pdMS_TO_TICKS(2)); // Delay after mux switch
 
     // Build configuration (per datasheet Table 9)
@@ -730,9 +652,8 @@ void initReadADC(UINTPTR baseAddr, int8_t i2c_index, uint16_t channel) {
     }
 }
 
-int16_t readADC(UINTPTR baseAddr, int8_t i2c_index) {
+int16_t readADC(UINTPTR baseAddr) {
     
-    setIICmux(baseAddr, 1 << i2c_index);
 
     // Read Conversion Register (register 0x00)
     uint8_t reg = 0x00;    
@@ -779,9 +700,8 @@ void vTaskPwm(void *pvParameters)
         xSemaphoreGive(cfg->signalSem);
     }
 
-
-    //Forced Initialization
     disableAllDutyCycle();
+
     TickType_t lastWake = xTaskGetTickCount();
     
 
@@ -989,7 +909,7 @@ int main(void)
     {
         perror("Gpio Initialization Failed\r\n");
     }
-
+    enableAllDutyCycle();
 
     SemaphoreHandle_t semAtoB = xSemaphoreCreateBinary();
     SemaphoreHandle_t semBtoC = xSemaphoreCreateBinary();
@@ -1008,12 +928,12 @@ int main(void)
     // Define configs (static or global so they persist in memory)
     // Handles disable outputs and alert intpus  (the second one is not used)      
     configA.op = &op; 
-    configA.baseAddr = XPAR_AXI_IIC_IOEXP_1_BASEADDR;
+    configA.baseAddr = XPAR_I2C_MAGNET_PORTS_AXI_IIC_IOEXP_1_BASEADDR;
     configA.waitSem = NULL; 
     configA.signalSem = semAtoB;
 
     configB.op = &op; 
-    configB.baseAddr = XPAR_AXI_IIC_IOEXP_2_BASEADDR;
+    configB.baseAddr = XPAR_I2C_MAGNET_PORTS_AXI_IIC_IOEXP_2_BASEADDR;
     configB.waitSem = semAtoB; 
     configB.signalSem = semBtoC;
 
@@ -1128,6 +1048,8 @@ int main(void)
         }
     }
 
+
+
     vTaskStartScheduler();
     // nada después de vTaskStartScheduler se ejecuta a menos que falle
     while (1)
@@ -1151,11 +1073,20 @@ void setPwmFrequency(uint8_t id, float frequency)
 
     uint32_t TIMING_REG;
 
+    TIMING_REG = Xil_In32(PWM_ADDRESS[id]);
+    //printf("\tPREV TIMING REG: %u\t", TIMING_REG);
+
+
     TIMING_REG = (uint32_t)((PWM_BASE_CLK / frequency - 1) + 0.5); // 0.5 rounds up
 
     Xil_Out32(PWM_ADDRESS[id], TIMING_REG);
     // To-Do: Disable PWM first
-    printf("Set PWM N %u at %.2f kHz. TIMING REG: %u\n", id, frequency, TIMING_REG);
+    //printf("Set PWM N %u at %.2f kHz. TIMING REG: %u", id, frequency, TIMING_REG);
+
+    TIMING_REG = Xil_In32(PWM_ADDRESS[id]);
+    //printf("\tVERIFIED TIMING REG: %u\n", TIMING_REG);
+
+    
 }
 
 void setDutyCycle(uint8_t id, float dutyCycle)
@@ -1171,7 +1102,7 @@ void setDutyCycle(uint8_t id, float dutyCycle)
     int32_t DC_REG;
     DC_REG = TIMING_REG * dutyCycle / 100;
     Xil_Out32(PWM_ADDRESS[id] + 4, DC_REG);
-    // xil_printf("Set PWM N %u at %.2f %%. DC REG: %d\n",id,dutyCycle,DC_REG);
+    //printf("Set PWM N %u at %.2f %%. DC REG: %d. Timing REG: %d\n",id,dutyCycle,DC_REG, TIMING_REG);
 }
 
 void enableAllDutyCycle(void)
