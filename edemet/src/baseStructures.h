@@ -14,6 +14,8 @@
 #define BITS_TEMPERATURE 11
 #define BITS_POWER 11
 
+#define MAX_PANEL_BRIGHTNESS 50
+
 #define EM_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_MAGNETIC_FIELD/8 // size in bytes, not actually the number of samples
 #define EM_MEASURE_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_MAGNETIC_FIELD/8
 #define EM_TEMP_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_TEMPERATURE/8
@@ -56,7 +58,7 @@
     .currentState = STOP_STATE,     \
     .operationTime = 0,             \
     .delayTime = 0,                 \
-    .currentTimeTick = 0,           \
+    .initialTimeTick = 0,           \
     .relativeTimeTick = 0,          \
     .currentStage = STAGE_NONE,\
     .currentStatus = STATUS_STOP,   \
@@ -123,6 +125,7 @@ typedef struct {
     int16_t last_em_measure;
     uint16_t last_em_pwr;
     int16_t last_em_temp;
+    uint8_t em_group;
     uint8_t *em_ctrl; // fixed size, initialized on main
     uint8_t *em_measure; // fixed size, initialized on main
     uint8_t *em_pwr; // fixed size, initialized on main
@@ -136,7 +139,7 @@ typedef struct {
     uint32_t operationTime;             // Total operation time (ms, ticks, etc.)
     uint32_t delayTime;                 // Delay time between stages
     uint32_t relativeTimeTick;          // Current elapsed time
-    uint32_t currentTimeTick;
+    uint32_t initialTimeTick;
     uint16_t signalSamplePeriodMs;      // Period of reproduction of the signal    
     uint32_t generalPlaybackIndex;
     bool availableEms[NUM_EM];

@@ -27,7 +27,7 @@
 #endif
 
 
-uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op);
+uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *op);
 uint16_t buildPacketEMconfig(uint32_t start, uint32_t end, uint8_t em_ring_index, uint8_t em_id, uint8_t *buffer_reply,operation_control_t *op);
 /* Private function prototypes */
 static void W5100_SPIBegin(W5100_Handle *handle);
@@ -995,7 +995,9 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
   uint8_t static_mode = data[12];
   uint8_t frot_val = data[13];
   uint8_t cols = data[14];
-  uint32_t vec_len = read_u32_be(&data[15]);
+  uint8_t em_group = data[15];
+  uint32_t vec_len = read_u32_be(&data[16]);
+  
 
   // Validate parameters
   if (ring > 2) {
@@ -1023,7 +1025,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
   uint32_t num_groups = (vec_len * 13 + 7) / 8; // ceil(vec_len / 8)
   uint32_t expected_vector_bytes = num_groups;
   // uint32_t expected_total_bytes = CFG_EM_HEADER_LEN + expected_vector_bytes;
-  uint32_t expected_total_bytes = 19 + expected_vector_bytes;
+  uint32_t expected_total_bytes = 20 + expected_vector_bytes;
 
   if (total_length < expected_total_bytes) {
     xil_printf("ERROR: Incomplete vector data. Expected %d bytes, got %d\r\n",
@@ -1069,6 +1071,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
   em->rotational_frequency_factor = frot_val;
   em->coils_columns = cols;
   em->playbackIndex = 0;
+  em->em_group = em_group;
 
   // Store packed vector data and loop it in-place
   if (vec_len > 0 && em->em_ctrl != NULL) {
@@ -1085,7 +1088,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     uint32_t original_bytes = ((original_samples * 13) + 7) >> 3;
 
     // 1) Copy received packed data
-    memcpy(buf, &data[19], original_bytes);
+    memcpy(buf, &data[20], original_bytes);
 
     // 2) Loop / expand samples in-place
     for (uint32_t i = original_samples; i < target_samples; i++) {
@@ -1321,15 +1324,17 @@ static void TCP_Server_Task(void *pvParameters) {
           response[9] = VERSION_PATCH;
           response[10] = op->currentState;
           response[11] = op->currentStage;
-          uint32_t current_time =
-              (op->generalPlaybackIndex * op->signalSamplePeriodMs) / 100;
+
           memcpy(response + 12, (uint8_t *)&(op->operationTime),
                  sizeof(op->operationTime));
           memcpy(response + 16, (uint8_t *)&(op->delayTime),
                  sizeof(op->delayTime));
           memcpy(response + 20, (uint8_t *)&(op->relativeTimeTick),
                  sizeof(op->relativeTimeTick));
-          response_length = 24;
+          memcpy(response + 24, (uint8_t *)&(op->generalPlaybackIndex),
+                 sizeof(op->relativeTimeTick));
+          
+          response_length = 28;
           break;
         case CMD_CODE_READ_STATE:
           xil_printf("Read state cmd\r\n");
@@ -1341,7 +1346,7 @@ static void TCP_Server_Task(void *pvParameters) {
             end_index_address =
               ((uint32_t)recv_buf[6] << 24) | ((uint32_t)recv_buf[7] << 16) |
               ((uint32_t)recv_buf[8] << 8) | (uint32_t)recv_buf[9];
-            response_length = buildPacket(index_address,end_index_address,response,op);
+            response_length = buildPacket(index_address,response,op);
             break;
         case CMD_CODE_GET_EM_CONFIG:
           response[0] = (cmd & 0xFF00) >> 8;
@@ -1378,7 +1383,8 @@ static void TCP_Server_Task(void *pvParameters) {
           response[13] = op->em[em_array_idx].static_mode;
           response[14] = op->em[em_array_idx].rotational_frequency_factor;
           response[15] = op->em[em_array_idx].coils_columns;
-          response_length = 16;
+          response[16] = op->em[em_array_idx].em_group;
+          response_length = 17;
 
           break;
         case CMD_CODE_GET_EM_CFG_VECTOR:
@@ -1631,12 +1637,9 @@ static void bw_write(BitWriter *bw, uint32_t value, uint32_t bits)
 
 #define SAMPLE_SIZE 182
 
-uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operation_control_t *op)
+uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *op)
 {
-
-
-    //Validation 
-
+    //Validation
     if (buffer_reply == NULL)
     {
         return 0;
@@ -1647,18 +1650,9 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
 
     //translatin miliseconds to sample:
     uint32_t realStartIndex,realEndIndex;
-    realStartIndex = start / op->signalSamplePeriodMs;
-    realEndIndex = end/op->signalSamplePeriodMs;
-
-
-
-    if ((start>end) /*&& (start != 0xFFFFFFFF)*/)
-    {
-        buffer_reply[2] = RESPONSE_ERROR_INVALID_TIME;
-        return 3;
-    }
+    realStartIndex = start;
+    realEndIndex = realStartIndex+6;
     
-
     if (realEndIndex>  op->generalPlaybackIndex)
     {
         realEndIndex = op->generalPlaybackIndex;
@@ -1705,7 +1699,7 @@ uint16_t buildPacket(uint32_t start, uint32_t end, uint8_t *buffer_reply,operati
     else
     {
         uint32_t time;
-        time = xTaskGetTickCount()/configTICK_RATE_HZ*1000;
+        time = op->generalPlaybackIndex;
         buffer_reply[3] = ((time) >> 24) & 0xFF;
         buffer_reply[4] = ((time) >> 16) & 0xFF;
         buffer_reply[5] = ((time) >> 8) & 0xFF;

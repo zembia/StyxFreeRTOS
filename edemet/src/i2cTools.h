@@ -56,7 +56,7 @@ bool ADS1115_ReadReg(UINTPTR BaseAddress, uint8_t DevAddr,
 void checkAllI2CDevices(void);
 void setIICmux(UINTPTR BaseAddress, uint8_t index);
 bool checkPresence(UINTPTR BaseAddress, uint8_t deviceAddress);
-void checkIICchannel(UINTPTR BaseAddress);
+
 bool PCA9535_WriteReg(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t Reg, uint8_t Data);
 bool PCA9535_ReadReg(UINTPTR BaseAddress, uint8_t DevAddr,  uint8_t Reg, uint8_t *Data);
 bool PCA9535_SetPins0to11_Output(UINTPTR BaseAddress, uint8_t DevAddr);
@@ -73,5 +73,5 @@ bool I2C_CheckBusIdle(UINTPTR BaseAddress);
 void I2C_ResetBus(UINTPTR BaseAddress);
 bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option);
 bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option);
-
+uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok);
 #endif

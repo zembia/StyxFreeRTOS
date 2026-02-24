@@ -61,8 +61,9 @@ void I2C_ResetBus(UINTPTR BaseAddress) {
     CntlReg = XIIC_CR_MSMS_MASK | XIIC_CR_ENABLE_DEVICE_MASK;		
     //XIic_WriteReg(BaseAddress,  XIIC_CR_REG_OFFSET, CntlReg);
 
-    //XIic_WriteReg(BaseAddress, 0x138, 0x0F4);
-    //XIic_WriteReg(BaseAddress, 0x144, 200);
+/*
+    XIic_WriteReg(BaseAddress, 0x13C, 0x4C);
+    XIic_WriteReg(BaseAddress, 0x140, 0x4C);*/
     
 
     
@@ -182,7 +183,7 @@ bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t l
     return false;
 }
 
-uint8_t ADDRESS_TO_CHECK[] = {INA740_ADDR,TMP102_ADDR};
+uint8_t ADDRESS_TO_CHECK[] = {INA740_ADDR,TMP102_ADDR,ADS1115_ADDR};
 
 //Function prototypes
 static uint8_t pca9535_out0_shadow = 0x00;
@@ -268,27 +269,27 @@ void checkAllI2CDevices(void)
         return;
     }
 
-
+    bool magnetVector[5];
     printf("Checking AXI_A:\r\n");
-    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR);
+    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR,magnetVector);
     printf("Checking AXI_B:\r\n");
-    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_B_BASEADDR);
+    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_B_BASEADDR,magnetVector);
     printf("Checking AXI_C:\r\n");
-    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_C_BASEADDR);
+    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_C_BASEADDR,magnetVector);
     printf("Checking AXI_D:\r\n");
-    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_D_BASEADDR);
+    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_D_BASEADDR,magnetVector);
     printf("Checking AXI_E:\r\n");
-    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_E_BASEADDR);
+    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_E_BASEADDR,magnetVector);
     printf("Checking AXI_F:\r\n");
-    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_F_BASEADDR);    
+    checkIICchannel(XPAR_I2C_MAGNET_PORTS_AXI_IIC_F_BASEADDR,magnetVector);    
 
 }
 
 
-void checkIICchannel(UINTPTR BaseAddress)
+uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok)
 {
     uint8_t i,j;    
-    
+    bool everythingOK;
     printf("\tIICMUX...");
     if (checkPresence(BaseAddress,TCA9548ARGER_ADDR))
     {
@@ -296,6 +297,7 @@ void checkIICchannel(UINTPTR BaseAddress)
     }
     else {
         printf("\tnot found\r\n");
+        return 0;
     }
     for (i=0;i<5;i++)
     {
@@ -303,6 +305,7 @@ void checkIICchannel(UINTPTR BaseAddress)
         setIICmux(BaseAddress,1<<i);
         printf("\tPort %d...\r\n",i);
 
+        everythingOK = true;
         for (j=0;j<sizeof(ADDRESS_TO_CHECK);j++)
         {
             printf("\t\t%02X...",ADDRESS_TO_CHECK[j]);
@@ -312,9 +315,13 @@ void checkIICchannel(UINTPTR BaseAddress)
             }
             else{
                 printf("\tnot found\r\n");
+                everythingOK = false;
             }
         }
-    }
+        em_ok[i] = everythingOK;
+    } 
+
+    return 1;
 }
 
 void setIICmux(UINTPTR BaseAddress, uint8_t index)

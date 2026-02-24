@@ -12,8 +12,10 @@
 #include "baseStructures.h"
 #include "globaldefines.h"
 #include <projdefs.h>
+#include <stdint.h>
 #include "xiic_l.h"
 #include "xil_types.h"
+#include "math.h"
 
 const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_1_BASEADDR,
                             XPAR_PWM_MAGNETPWMCONTROLLER_2_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_3_BASEADDR,
@@ -31,13 +33,16 @@ const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_P
                             XPAR_PWM_MAGNETPWMCONTROLLER_26_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_27_BASEADDR,
                             XPAR_PWM_MAGNETPWMCONTROLLER_28_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_29_BASEADDR
                             };
-
+float interpretTempearture(int16_t rawValue);
+float interpretMagneticField(int16_t rawValue);
 void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B);
 void initReadADC(UINTPTR baseAddr, uint16_t channel);
 
 
+QueueHandle_t xQueue[6] = {NULL};
 
 
+bool mangetStatus[30]={0};
 void vTaskPwm(void *pvParameters);
 void processCommand(char *);
 void setPwmMode(uint8_t id, bool mode);
@@ -186,19 +191,19 @@ void vTaskMagnet(void *pvParameters)
     if (baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR) {
         group_index = 0;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_B_BASEADDR) {
-        return;
+        //return;
         group_index = 1;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_C_BASEADDR ) {
-        return;
+        //return;
         group_index = 2;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_D_BASEADDR) {
-        return;
+        //return;
         group_index = 3;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_E_BASEADDR) {
-        return;
+        //return;
         group_index = 4;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_F_BASEADDR) {
-        return;
+        //return;
         group_index = 5;
     }
     I2C_ResetBus(baseAddr);
@@ -208,12 +213,33 @@ void vTaskMagnet(void *pvParameters)
   
     vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(2)); 
     TickType_t lastWake2 = xTaskGetTickCount();
+    TickType_t lastADC_READ=xTaskGetTickCount();
+    
 
     uint32_t startTime;
     uint32_t endTime;
     uint32_t difftime1 = 0, difftime2 = 0, difftime3 = 0;
 
     uint8_t counter=0;
+    bool once;
+    //we check the presence of every magnet
+    
+    checkIICchannel(baseAddr,&mangetStatus[group_index*5]);
+
+    for (int i=0;i<5;i++)
+    {
+        if (mangetStatus[group_index*5+i] == false)
+        {
+            setledPanelColor(group_index*5+i, MAX_PANEL_BRIGHTNESS, 0, 0);
+        }
+        else
+        {
+            setledPanelColor(group_index*5+i, 0, MAX_PANEL_BRIGHTNESS, 0);
+        }
+    }
+
+
+
     while (1)
     {   
         vTaskDelayUntil(&lastWake2, pdMS_TO_TICKS(10)); 
@@ -222,42 +248,76 @@ void vTaskMagnet(void *pvParameters)
         startTime = xTaskGetTickCount();
         // Start EM conversion of magnetic field (ADC)
         //xil_printf("[DBG] Starting mag conversions\r\n");
+        once = true;
         for (int ii=0; ii < 5; ii++) {
-            int i = 4;
-            setIICmux(baseAddr, 1 << i);
-            //Reading temperature converted in last loop
-            op->em[group_index*5+ii].last_em_temp = readADC(baseAddr);
-            //initing magnetic field conversion
-            initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
-            
-            //Reading INA
-            uint8_t buf[3] = {0x08, 0x00, 0x00};
-            // Set the pointer to power register
-            if (!I2C_SafeSend(baseAddr, 0x40, buf, 1, XIIC_STOP)) {
-                xil_printf("[ERROR] Failed to set INA register for EM %d\r\n", i);
-                op->em[group_index*5+ii].last_em_pwr = 0;
-                continue;
+
+            if (mangetStatus[group_index*5+ii])
+            {                
+                setIICmux(baseAddr, 1 << ii);
+                //Reading temperature converted in last loop
+                if (once && (lastADC_READ-xTaskGetTickCount()<=2))
+                {
+                    vTaskDelay(2);
+                }
+                op->em[group_index*5+ii].last_em_temp = interpretTempearture(readADC(baseAddr));
+                if (once)
+                {
+                    lastADC_READ = xTaskGetTickCount();
+                    once = false;
+                }
+                //initing magnetic field conversion
+                initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
+                
+                //Reading INA
+                uint8_t buf[3] = {0x08, 0x00, 0x00};
+                // Set the pointer to power register
+                if (!I2C_SafeSend(baseAddr, 0x40, buf, 1, XIIC_STOP)) {
+                    xil_printf("[ERROR] Failed to set INA register for EM %d\r\n", ii);
+                    op->em[group_index*5+ii].last_em_pwr = 0;
+                    continue;
+                }
+                
+                //xil_printf("[DBG] Power sensor %d - receiving data\r\n", i);
+                // Read voltage
+                if (!I2C_SafeRecv(baseAddr, 0x40, buf, 3, XIIC_STOP)) {
+                    xil_printf("[ERROR] Failed to read INA data for EM %d\r\n", ii);
+                    op->em[group_index*5+ii].last_em_pwr = 0;
+                    continue;
+                }
+                // Save EM power
+                op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;
             }
-            
-            //xil_printf("[DBG] Power sensor %d - receiving data\r\n", i);
-            // Read voltage
-            if (!I2C_SafeRecv(baseAddr, 0x40, buf, 3, XIIC_STOP)) {
-                xil_printf("[ERROR] Failed to read INA data for EM %d\r\n", i);
+            else
+            {
                 op->em[group_index*5+ii].last_em_pwr = 0;
-                continue;
+                op->em[group_index*5+ii].last_em_temp = 0;
             }
-            // Save EM power
-            op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;
         }
         
         
         // Read EM magnetic field (ADC) and setup temp read for next loop    
-
+        once = true;
         for (int ii=0; ii < 5; ii++) {
-            int i = 4;
-            setIICmux(baseAddr, 1 << i);
-            op->em[group_index*5+ii].last_em_measure = readADC(baseAddr);
-            initReadADC(baseAddr, ADS1115_TEMP1); 
+            if (mangetStatus[group_index*5+ii])
+            {
+                
+                setIICmux(baseAddr, 1 << ii);
+                if (once && (lastADC_READ-xTaskGetTickCount()<=2))
+                {
+                    vTaskDelay(2);
+                }
+                op->em[group_index*5+ii].last_em_measure = interpretMagneticField(readADC(baseAddr));
+                if (once)
+                {
+                    lastADC_READ = xTaskGetTickCount();
+                    once= false;
+                }
+                initReadADC(baseAddr, ADS1115_TEMP1); 
+            }
+            else
+            {
+                op->em[group_index*5+ii].last_em_measure = 0;
+            }
         }
 
 
@@ -716,6 +776,7 @@ void vTaskPwm(void *pvParameters)
                 if (prevState != op->currentState){
                     if (prevState == STOP_STATE || prevState == DONE_STATE){
                         op->generalPlaybackIndex = 0;
+                        op->initialTimeTick = xTaskGetTickCount();
                     }
                 }
 
@@ -768,6 +829,10 @@ void vTaskPwm(void *pvParameters)
                     }
 
                     setDutyCycle(i, pwmValue);
+                    if (mangetStatus[i])
+                    {
+                        setledPanelColor(i,0,0,pwmValue);
+                    }
                 }
 
                 // Increase index of each electromagnet, if last item reached reset to 0
@@ -798,6 +863,14 @@ void vTaskPwm(void *pvParameters)
                 for (int id = 0; id < 30; id++)
                 {
                     setDutyCycle(id, 0);
+                    if (mangetStatus[id])
+                    {
+                        setledPanelColor(id,0,MAX_PANEL_BRIGHTNESS,0);
+                    }
+                    else
+                    {
+                        setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                    }
                 }
 
                 // Reset index of each electromagnet
@@ -815,6 +888,14 @@ void vTaskPwm(void *pvParameters)
                 for (int id = 0; id < 30; id++)
                 {
                     setDutyCycle(id, 0);
+                    if (mangetStatus[id])
+                    {
+                        setledPanelColor(id,0,MAX_PANEL_BRIGHTNESS,0);
+                    }
+                    else
+                    {
+                        setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                    }
                 }
 
                 break;
@@ -924,6 +1005,15 @@ int main(void)
     SemaphoreHandle_t semLtoM = xSemaphoreCreateBinary();
     SemaphoreHandle_t semMtoN = xSemaphoreCreateBinary();
 
+    for (int i=0;i<6;i++)
+    {
+        xQueue[i] = xQueueCreate( 	1,sizeof( uint8_t ) );	/* Each space in the queue is large enough to hold a uint8_t. */
+        configASSERT(xQueue[i]);
+    }
+
+	
+
+
 
     // Define configs (static or global so they persist in memory)
     // Handles disable outputs and alert intpus  (the second one is not used)      
@@ -940,7 +1030,8 @@ int main(void)
     configC.op = &op; 
     configC.baseAddr = XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR;
     configC.waitSem = semBtoC; 
-    configC.signalSem = semItoJ;//semCtoD;
+    //configC.signalSem = semItoJ;//semCtoD;
+    configC.signalSem = semCtoD;
 
     configD.op = &op; 
     configD.baseAddr = XPAR_I2C_MAGNET_PORTS_AXI_IIC_B_BASEADDR;
@@ -1039,13 +1130,8 @@ int main(void)
 
 
     for (int i=0;i<30;i++){
-        if (i<10){
-            setledPanelColor(i, 10, 0, 0); // Red
-        } else if (i<20){
-            setledPanelColor(i, 0, 10, 0); // Green
-        } else {
-            setledPanelColor(i, 0, 0, 10); // Blue
-        }
+        setledPanelColor(i, 0, 0, 0); // Blue
+        
     }
 
 
@@ -1291,4 +1377,28 @@ void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B)
     uint32_t dataOut;
     dataOut = LED<<24 | R<<16 | G<<8 | B;
     Xil_Out32(XPAR_WS2812B_DRIVER_0_BASEADDR, dataOut);
+}
+
+
+
+#define REF_V 4680.0
+#define R1 24000
+float interpretTempearture(int16_t rawValue) {
+
+    //rawValue/(REF_V) = X/(X+R1);
+    //(rawValue/REF_V)*X +R1*(rawValue/REF_V)* = X
+    //X*(rawValue/REF_V - 1) = -R1*(rawValue/REF_V)
+    //X = -R1*(rawValue/REF_V) / (rawValue/REF_V - 1)
+    float X = -R1 * (rawValue / REF_V) / ((rawValue / REF_V) - 1);
+
+    float a = 639.5, b = -0.1332, c = -162.5;
+    float Temp = (a * pow(X, b) + c)*10;
+    //float Temp = 0;
+    // Assuming rawValue is a signed 11-bit integer representing temperature in °C with a scale factor of 0.125
+    return Temp;
+}
+
+float interpretMagneticField(int16_t rawValue)
+{
+    return (rawValue-2350)/0.73;
 }
