@@ -73,5 +73,5 @@ bool I2C_CheckBusIdle(UINTPTR BaseAddress);
 void I2C_ResetBus(UINTPTR BaseAddress);
 bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option);
 bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option);
-uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok);
+uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok, bool *pcie_status);
 #endif

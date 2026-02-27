@@ -6,6 +6,7 @@
 #include "xil_printf.h"
 #include "xparameters.h"
 #include "xspips.h"
+#include <projdefs.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -974,6 +975,8 @@ expected_vector_bytes);
  * @param total_length: Total length of data
  * @return Response code
  */
+
+ #define MAX_CPU_HOG 10
 static uint8_t process_vector_header_cmd(operation_control_t *op,
                                          const uint8_t *data,
                                          uint32_t total_length) {
@@ -1041,7 +1044,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
                em_array_idx, NUM_EM);
     return RESPONSE_ERROR_INVALID_EM;
   }
-
+  /*
   xil_printf("=== Parsing Vector Header Command ===\r\n");
   xil_printf("Ring: %d, EM: %d (Array index: %d)\r\n", ring, em_idx,
              em_array_idx);
@@ -1052,7 +1055,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
              frot_val / 10.0, cols);
   xil_printf("Vector length: %d values (%d bytes packed)\r\n", vec_len,
              expected_vector_bytes);
-
+  */
   // Acquire mutex for thread-safe access
   xSemaphoreTake(op->mutex, portMAX_DELAY);
 
@@ -1091,9 +1094,18 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     memcpy(buf, &data[20], original_bytes);
 
     // 2) Loop / expand samples in-place
+    TickType_t timeSample = xTaskGetTickCount();
+    int16_t v;
+
+    TickType_t lastSleepTime = xTaskGetTickCount();
     for (uint32_t i = original_samples; i < target_samples; i++) {
-      int16_t v = get13s(buf, i % original_samples);
+      v = get13s(buf, i % original_samples);
       put13s(buf, i, v);
+      if (xTaskGetTickCount()-lastSleepTime > MAX_CPU_HOG)
+      {
+        lastSleepTime = xTaskGetTickCount();
+        vTaskDelay(pdMS_TO_TICKS(1));
+      }
     }
 
     // 3) Update vector length to expanded size
@@ -1102,8 +1114,8 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     uint32_t total_bytes = ((target_samples * 13) + 7) >> 3;
 
     xil_printf(
-        "Stored %d samples (%d bytes packed, looped from %d samples)\r\n",
-        target_samples, total_bytes, original_samples);
+        "Stored %d samples (%d bytes packed, looped from %d samples). Took %d ms\r\n",
+        target_samples, total_bytes, original_samples, xTaskGetTickCount()-timeSample);
   }
 
   xSemaphoreGive(op->mutex);
@@ -1124,7 +1136,7 @@ static void TCP_Server_Task(void *pvParameters) {
   uint16_t base = W5100_S0_BASE + (sock * 0x0100);
   uint8_t recv_buf[1500];
   uint8_t response[SEND_PACKET_MAX_SIZE+CRC_LEN];
-  uint8_t response_length = 0;
+  uint16_t response_length = 0;
   uint32_t tmp_wrapper_pkt_index = 0;
   uint32_t wrapper_pkt_index = 0;
   uint16_t tmp_wrapper_total_pkts = 0;
@@ -1227,6 +1239,10 @@ static void TCP_Server_Task(void *pvParameters) {
             // PLAY
             xil_printf("Play cmd\r\n");
             xSemaphoreTake(op->mutex, portMAX_DELAY);
+            if (op->currentState == STOP_STATE )
+            {
+              op->generalPlaybackIndex = 0;
+            }
             op->cmd = CMD_PLAY;
             xSemaphoreGive(op->mutex);
             response[0] = (cmd & 0xFF00) >> 8;
@@ -1663,6 +1679,7 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
        buffer_reply[2] =  RESPONSE_ERROR_VECTOR_TOO_LARGE;
        return 3;
     }
+    buffer_reply[2] = RESPONSE_SUCCESS;
 
     BitWriter bw;
     bw.bitPos = 0;
@@ -1694,6 +1711,11 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
             bw_write(&bw,dummystart, 1);
             bw_write(&bw,get13s(cfle_pwr, j), 15);
         }
+        // DBG
+      /*  buffer_reply[7]  = ((op->generalPlaybackIndex) >> 24) & 0xFF;
+        buffer_reply[8]  = ((op->generalPlaybackIndex) >> 16) & 0xFF;
+        buffer_reply[9]  = ((op->generalPlaybackIndex) >> 8) & 0xFF;
+        buffer_reply[10] =  (op->generalPlaybackIndex) & 0xFF;*/
         return 7+(realEndIndex-realStartIndex)*SAMPLE_SIZE;
     }
     else

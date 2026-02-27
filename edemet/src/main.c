@@ -17,6 +17,8 @@
 #include "xil_types.h"
 #include "math.h"
 
+
+/*
 const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_1_BASEADDR,
                             XPAR_PWM_MAGNETPWMCONTROLLER_2_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_3_BASEADDR,
                             XPAR_PWM_MAGNETPWMCONTROLLER_4_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_5_BASEADDR,
@@ -33,16 +35,36 @@ const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_P
                             XPAR_PWM_MAGNETPWMCONTROLLER_26_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_27_BASEADDR,
                             XPAR_PWM_MAGNETPWMCONTROLLER_28_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_29_BASEADDR
                             };
+                            */
+
+const uint32_t PWM_ADDRESS[30]={    XPAR_PWM_MAGNETPWMCONTROLLER_12_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_9_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_6_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_3_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_2_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_28_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_25_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_22_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_19_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_16_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_13_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_10_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_7_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_4_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_1_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_27_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_24_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_21_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_18_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_15_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_29_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_26_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_23_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_20_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_17_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_14_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_11_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_8_BASEADDR,
+                                    XPAR_PWM_MAGNETPWMCONTROLLER_5_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR
+                            };                            
 float interpretTempearture(int16_t rawValue);
 float interpretMagneticField(int16_t rawValue);
 void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B);
 void initReadADC(UINTPTR baseAddr, uint16_t channel);
-
+void updateTemperaturePL(uint8_t id, int32_t temperature);
 
 QueueHandle_t xQueue[6] = {NULL};
 
 
 bool mangetStatus[30]={0};
+bool pcieStatus[30]={0};
+
 void vTaskPwm(void *pvParameters);
 void processCommand(char *);
 void setPwmMode(uint8_t id, bool mode);
@@ -75,7 +97,7 @@ typedef struct
 
 state_t state;
 
-operation_control_t op = OPERATION_CONTROL_INIT;
+volatile operation_control_t op = OPERATION_CONTROL_INIT;
 static task_manager_t configA;
 static task_manager_t configB;
 static task_manager_t configC;
@@ -187,7 +209,7 @@ void vTaskMagnet(void *pvParameters)
     TickType_t lastWake = xTaskGetTickCount();
     
     
-    uint8_t group_index;
+    uint8_t group_index = 0xFF;
     if (baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR) {
         group_index = 0;
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_B_BASEADDR) {
@@ -205,6 +227,11 @@ void vTaskMagnet(void *pvParameters)
     } else if(baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_F_BASEADDR) {
         //return;
         group_index = 5;
+    }
+
+    if (group_index > 5) {
+        xil_printf("[ERROR] %s invalid baseAddr 0x%08x\r\n", pcTaskName, baseAddr);
+        vTaskDelete(NULL);
     }
     I2C_ResetBus(baseAddr);
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -224,13 +251,20 @@ void vTaskMagnet(void *pvParameters)
     bool once;
     //we check the presence of every magnet
     
-    checkIICchannel(baseAddr,&mangetStatus[group_index*5]);
+    checkIICchannel(baseAddr,&mangetStatus[group_index*5],&pcieStatus[group_index*5]);
 
     for (int i=0;i<5;i++)
     {
         if (mangetStatus[group_index*5+i] == false)
         {
-            setledPanelColor(group_index*5+i, MAX_PANEL_BRIGHTNESS, 0, 0);
+            if (pcieStatus[group_index*5+i] == true)
+            {
+                setledPanelColor(group_index*5+i, MAX_PANEL_BRIGHTNESS, MAX_PANEL_BRIGHTNESS*0.4, 0);
+            }
+            else
+            {
+                setledPanelColor(group_index*5+i, MAX_PANEL_BRIGHTNESS, 0, 0);
+            }
         }
         else
         {
@@ -242,8 +276,7 @@ void vTaskMagnet(void *pvParameters)
 
     while (1)
     {   
-        vTaskDelayUntil(&lastWake2, pdMS_TO_TICKS(10)); 
-                     
+        vTaskDelayUntil(&lastWake2, pdMS_TO_TICKS(8)); 
         //xil_printf("[DBG] Loop start\r\n");
         startTime = xTaskGetTickCount();
         // Start EM conversion of magnetic field (ADC)
@@ -255,11 +288,15 @@ void vTaskMagnet(void *pvParameters)
             {                
                 setIICmux(baseAddr, 1 << ii);
                 //Reading temperature converted in last loop
-                if (once && (lastADC_READ-xTaskGetTickCount()<=2))
+                if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
                 {
-                    vTaskDelay(2);
+                    vTaskDelay(pdMS_TO_TICKS(2));
                 }
                 op->em[group_index*5+ii].last_em_temp = interpretTempearture(readADC(baseAddr));
+                for (int i=0;i<30;i++)
+                {
+                    updateTemperaturePL(i, op->em[group_index*5+ii].last_em_temp);//Update temp in hardware
+                }
                 if (once)
                 {
                     lastADC_READ = xTaskGetTickCount();
@@ -302,9 +339,9 @@ void vTaskMagnet(void *pvParameters)
             {
                 
                 setIICmux(baseAddr, 1 << ii);
-                if (once && (lastADC_READ-xTaskGetTickCount()<=2))
+                if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
                 {
-                    vTaskDelay(2);
+                    vTaskDelay(pdMS_TO_TICKS(2));
                 }
                 op->em[group_index*5+ii].last_em_measure = interpretMagneticField(readADC(baseAddr));
                 if (once)
@@ -323,9 +360,13 @@ void vTaskMagnet(void *pvParameters)
 
         if (++counter >=128)
         {
-            xil_printf("------\r\n");
-            for (int i=0; i < 5; i++) {
-                xil_printf("%d: %d // %d // %d\r\n", group_index, op->em[group_index*5+i].last_em_temp, op->em[group_index*5+i].last_em_pwr, op->em[group_index*5+i].last_em_measure);
+           if (group_index==0)
+           {
+                xil_printf("------\r\n");
+                for (int i=0; i < 5; i++) {
+                    
+                    xil_printf("%d: %d // %d // %d\r\n", group_index, op->em[group_index*5+i].last_em_temp, op->em[group_index*5+i].last_em_pwr, op->em[group_index*5+i].last_em_measure);
+                }
             }
             counter=0;
         }
@@ -743,6 +784,7 @@ void vTaskPwm(void *pvParameters)
     task_manager_t *cfg = (task_manager_t *)pvParameters;
     operation_control_t *op = cfg->op;
     function_state_t prevState = op->currentState;    
+    function_state_t currentState = op->currentState;    
     uint32_t baseAddr = cfg->baseAddr;
 
     // Get task name (as you requested)
@@ -759,7 +801,14 @@ void vTaskPwm(void *pvParameters)
     if (cfg->signalSem != NULL) {
         xSemaphoreGive(cfg->signalSem);
     }
-
+    //enableAllDutyCycle();
+    for (int i=0;i<30;i++)
+    {
+        //setPwmMode(i,0);
+        setPwmFrequency(i,1); // 1 kHz
+        //setDutyCycle(i,50);
+    }
+    //vTaskDelay(portMAX_DELAY);
     disableAllDutyCycle();
 
     TickType_t lastWake = xTaskGetTickCount();
@@ -769,11 +818,14 @@ void vTaskPwm(void *pvParameters)
     {
         // ======== STEP 3 ========
         // apply PWM values
-        switch (op->currentState)
+
+        prevState = currentState;
+        currentState = op->currentState;
+        switch (currentState)
         {
             case PLAY_STATE:
                 // Resets the index just if a new process was started
-                if (prevState != op->currentState){
+                if (prevState != currentState){
                     if (prevState == STOP_STATE || prevState == DONE_STATE){
                         op->generalPlaybackIndex = 0;
                         op->initialTimeTick = xTaskGetTickCount();
@@ -831,7 +883,14 @@ void vTaskPwm(void *pvParameters)
                     setDutyCycle(i, pwmValue);
                     if (mangetStatus[i])
                     {
-                        setledPanelColor(i,0,0,pwmValue);
+                        if (pwmValue>0)
+                        {
+                            setledPanelColor(i,0,0,pwmValue);
+                        }
+                        else
+                        {
+                            setledPanelColor(i,0,0,-pwmValue);
+                        }
                     }
                 }
 
@@ -869,7 +928,14 @@ void vTaskPwm(void *pvParameters)
                     }
                     else
                     {
-                        setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                        if (pcieStatus[id])
+                        {
+                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS,MAX_PANEL_BRIGHTNESS*0.4,0);
+                        }
+                        else
+                        {
+                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                        }
                     }
                 }
 
@@ -894,7 +960,14 @@ void vTaskPwm(void *pvParameters)
                     }
                     else
                     {
-                        setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                        if (pcieStatus[id])
+                        {
+                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS,MAX_PANEL_BRIGHTNESS*0.4,0);
+                        }
+                        else
+                        {
+                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                        }
                     }
                 }
 
@@ -904,7 +977,7 @@ void vTaskPwm(void *pvParameters)
         }
 
         // DBG
-        if (op->currentState != PLAY_STATE){
+        if (currentState != PLAY_STATE){
             for (int i = 0; i < NUM_EM; i++)
                 {
                     // Get current PWM value from em_ctrl vector. considering that the variables are 13 bits length
@@ -946,7 +1019,7 @@ void vTaskPwm(void *pvParameters)
 
         
 
-        prevState = op->currentState;
+        
     }
 }
 
@@ -980,6 +1053,7 @@ int main(void)
         op.em[i].em_temp = em_temp[i];
         op.em[i].mode = 1;
         op.em[i].magnetic_field_amplitude = 1500;
+        op.em[i].em_group = 1;
     }
     op.cfle_pwr = cfle_pwr;
     xil_printf("done\r\n");
@@ -1087,31 +1161,31 @@ int main(void)
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskIoExp2\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetA" , 1024  , &configC, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetA" , 1024  , &configC, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetA\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetB" , 1024  , &configD, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetB" , 1024  , &configD, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetB\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetC" , 1024  , &configE, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetC" , 1024  , &configE, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetC\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetD" , 1024  , &configF, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetD" , 1024  , &configF, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetD\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetE" , 1024  , &configG, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetE" , 1024  , &configG, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetE\r\n");
     }
-    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetF" , 1024  , &configH, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskMagnet     , "MagnetF" , 1024  , &configH, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetF\r\n");
     }
-    taskStatus = xTaskCreate(vTaskPwm        , "Pwm"     , 2048  , &configI, tskIDLE_PRIORITY + 1, NULL);
+    taskStatus = xTaskCreate(vTaskPwm        , "Pwm"     , 2048  , &configI, tskIDLE_PRIORITY + 3, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskPwm\r\n");
     }
@@ -1401,4 +1475,9 @@ float interpretTempearture(int16_t rawValue) {
 float interpretMagneticField(int16_t rawValue)
 {
     return (rawValue-2350)/0.73;
+}
+
+void updateTemperaturePL(uint8_t id, int32_t temperature)
+{
+    Xil_Out32(PWM_ADDRESS[id] + 12, temperature);
 }
