@@ -17,25 +17,7 @@
 #include "xil_types.h"
 #include "math.h"
 
-
-/*
-const uint32_t PWM_ADDRESS[30]={  XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_1_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_2_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_3_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_4_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_5_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_6_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_7_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_8_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_9_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_10_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_11_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_12_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_13_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_14_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_15_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_16_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_17_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_18_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_19_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_20_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_21_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_22_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_23_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_24_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_25_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_26_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_27_BASEADDR,
-                            XPAR_PWM_MAGNETPWMCONTROLLER_28_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_29_BASEADDR
-                            };
-                            */
+#include "magnetTools.h"
 
 const uint32_t PWM_ADDRESS[30]={    XPAR_PWM_MAGNETPWMCONTROLLER_12_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_9_BASEADDR,
                                     XPAR_PWM_MAGNETPWMCONTROLLER_6_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_3_BASEADDR,
@@ -53,11 +35,8 @@ const uint32_t PWM_ADDRESS[30]={    XPAR_PWM_MAGNETPWMCONTROLLER_12_BASEADDR,XPA
                                     XPAR_PWM_MAGNETPWMCONTROLLER_11_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_8_BASEADDR,
                                     XPAR_PWM_MAGNETPWMCONTROLLER_5_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR
                             };                            
-float interpretTempearture(int16_t rawValue);
-float interpretMagneticField(int16_t rawValue);
-void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B);
 void initReadADC(UINTPTR baseAddr, uint16_t channel);
-void updateTemperaturePL(uint8_t id, int32_t temperature);
+
 
 QueueHandle_t xQueue[6] = {NULL};
 
@@ -66,8 +45,6 @@ bool mangetStatus[30]={0};
 bool pcieStatus[30]={0};
 
 void vTaskPwm(void *pvParameters);
-void processCommand(char *);
-void setPwmMode(uint8_t id, bool mode);
 int16_t get13s(const uint8_t *buf, uint32_t index);
 int16_t readADC(UINTPTR baseAddr);
 void read_all_em_analog_inputs(void);
@@ -112,73 +89,11 @@ static task_manager_t configK;
 static task_manager_t configL;
 static task_manager_t configM;
 static task_manager_t configN;
-// we need 1 task per I2C group
-// static TaskHandle_t i2c_A_task, i2c_B_task, i2c_C_task, i2c_D_task, i2c_E_task, i2c_F_task;
-
-/*
-// Función de tarea de ejemplo
-void vTaskHello(void *pvParameters)
-{
-
-    operation_control_t *op = (operation_control_t *)pvParameters;
-    bool prevStatus = op->outputsStatus;
-    xil_printf("Starting i2c task\r\n");
-
-    // checkAllI2CDevices();
-    vTaskDelay(pdMS_TO_TICKS(1));
-    // disableOutputs();
-    op->i2cReady = true;
-
-    while (1)
-    {
-        vTaskDelay(pdMS_TO_TICKS(500));
-
-        setIICmux(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR, 1 << 4);
-        vTaskDelay(pdMS_TO_TICKS(10));
-
-        // Build configuration (per datasheet Table 9)
-        uint16_t config = ADS1115_OS_SINGLE |       // Start single conversion
-                          0x50 |                    // Select input
-                          ADS1115_PGA_4_096V |      // ±4.096V range
-                          ADS1115_MODE_SINGLE |     // Single-shot mode
-                          ADS1115_DR_128SPS |       // 128 SPS
-                          ADS1115_COMP_QUE_DISABLE; // Disable comparator
-        uint16_t flip_config = config << 8 | config >> 8;
-        config = flip_config;
-
-        // xil_printf("Writing config 0x%04X to start conversion\r\n", config);
-
-        //-- START
-        // Write Config Register to start conversion
-        uint8_t write_buf[3];
-        write_buf[0] = 0x01; // Config register
-        write_buf[1] = 0xC3; // MSB of config
-        write_buf[2] = 0x83; // LSB of config
-
-        XIic_Send(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR, 0x48, write_buf, 3, XIIC_STOP);
-
-        vTaskDelay(pdMS_TO_TICKS(20)); // Wait for conversion
-
-        // Read Conversion Register (register 0x00)
-        uint8_t reg = 0x00;
-        uint8_t buf[2];
-
-        XIic_Send(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR, 0x48, &reg, 1, XIIC_STOP);
-        XIic_Recv(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR, 0x48, buf, 2, XIIC_STOP);
-
-        int16_t result = ((int16_t)buf[0] << 8) | buf[1];
-        xil_printf("Result = %d\r\n", result);
-        //-- END
-    }
-}
-*/
 
 
 // Read magnetic and temperature of each of the 5 EMs corresponding to the current I2C Port
 void vTaskMagnet(void *pvParameters)
-{
-    
-    
+{        
     // Extract the configuration
     task_manager_t *cfg = (task_manager_t *)pvParameters;
     operation_control_t *op = cfg->op;
@@ -192,23 +107,13 @@ void vTaskMagnet(void *pvParameters)
     if (cfg->waitSem != NULL) {
         xSemaphoreTake(cfg->waitSem, portMAX_DELAY);
     }
-
     xil_printf("Starting %s at address 0x%08x\r\n", pcTaskName, baseAddr);    
-    
-    // checkAllI2CDevices();
-
-    // for (int i = 0; i < 5; i++) {        
-    //     initReadADC(baseAddr, i, ADS1115_MAGNETIC_FIELD);        
-    // }
-
     // 3. Signal the next task in the chain
     if (cfg->signalSem != NULL) {
         xSemaphoreGive(cfg->signalSem);
     }
+    TickType_t lastWake = xTaskGetTickCount();    
 
-    TickType_t lastWake = xTaskGetTickCount();
-    
-    
     uint8_t group_index = 0xFF;
     if (baseAddr == XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR) {
         group_index = 0;
@@ -271,8 +176,6 @@ void vTaskMagnet(void *pvParameters)
             setledPanelColor(group_index*5+i, 0, MAX_PANEL_BRIGHTNESS, 0);
         }
     }
-
-
 
     while (1)
     {   
@@ -426,27 +329,6 @@ void vTaskIoExp(void *pvParameters)
         }
     }
 }
-
-// void read_analog_inputs(void)
-// {
-//     int16_t an0, an1, an2;
-
-//     // Example: ADS1115 is on mux channel 0 of AXI_IIC_A
-//     if (ADS1115_ReadAN0_AN1_AN2(XPAR_I2C_MAGNET_PORTS_AXI_IIC_A_BASEADDR,
-//                                 0,  // Mux channel 0
-//                                 &an0, &an1, &an2)) {
-//         // Convert to millivolts
-//         int32_t mv0 = ADS1115_RawToMillivolts(an0, ADS1115_PGA_4_096V);
-//         int32_t mv1 = ADS1115_RawToMillivolts(an1, ADS1115_PGA_4_096V);
-//         int32_t mv2 = ADS1115_RawToMillivolts(an2, ADS1115_PGA_4_096V);
-
-//         printf("AN0: %d mV (raw: %d)\r\n", mv0, an0);
-//         printf("AN1: %d mV (raw: %d)\r\n", mv1, an1);
-//         printf("AN2: %d mV (raw: %d)\r\n", mv2, an2);
-//     } else {
-//         printf("Failed to read analog inputs\r\n");
-//     }
-// }
 
 // Or if you want to read from multiple electromagnets:
 void read_all_em_analog_inputs(void)
@@ -727,11 +609,7 @@ void vTaskMain(void *pvParameters)
     }
 }
 
-void initReadADC(UINTPTR baseAddr, uint16_t channel) {
-    
-    
-    //vTaskDelay(pdMS_TO_TICKS(2)); // Delay after mux switch
-
+void initReadADC(UINTPTR baseAddr, uint16_t channel) {    
     // Build configuration (per datasheet Table 9)
     uint16_t config = ADS1115_OS_SINGLE |       // Start single conversion
                         channel |
@@ -805,10 +683,10 @@ void vTaskPwm(void *pvParameters)
     for (int i=0;i<30;i++)
     {
         //setPwmMode(i,0);
-        setPwmFrequency(i,1); // 1 kHz
+        setPwmFrequency(i,0.4); // 1 kHz
         //setDutyCycle(i,50);
     }
-    //vTaskDelay(portMAX_DELAY);
+   // vTaskDelay(portMAX_DELAY);
     disableAllDutyCycle();
 
     TickType_t lastWake = xTaskGetTickCount();
@@ -1017,9 +895,6 @@ void vTaskPwm(void *pvParameters)
             vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(op->signalSamplePeriodMs)); 
         }
 
-        
-
-        
     }
 }
 
@@ -1249,63 +1124,7 @@ void setPwmFrequency(uint8_t id, float frequency)
     
 }
 
-void setDutyCycle(uint8_t id, float dutyCycle)
-{
-    if (id > 29)
-    {
-        perror("ID not valid\n");
-        return;
-    }
-    int32_t TIMING_REG;
-    TIMING_REG = Xil_In32(PWM_ADDRESS[id]);
 
-    int32_t DC_REG;
-    DC_REG = TIMING_REG * dutyCycle / 100;
-    Xil_Out32(PWM_ADDRESS[id] + 4, DC_REG);
-    //printf("Set PWM N %u at %.2f %%. DC REG: %d. Timing REG: %d\n",id,dutyCycle,DC_REG, TIMING_REG);
-}
-
-void enableAllDutyCycle(void)
-{
-    XGpio_DiscreteWrite(&pwmEnableGpio, 1, 1);
-}
-
-void disableAllDutyCycle(void)
-{
-    XGpio_DiscreteWrite(&pwmEnableGpio, 1, 0);
-}
-
-void processCommand(char *cmd)
-{
-    int id;
-    float freq, duty;
-
-    if (sscanf(cmd, "SET %d %f %f", &id, &freq, &duty) == 3)
-    {
-        setPwmFrequency(id, freq);
-        setDutyCycle(id, duty);
-        xil_printf("ACK: ID=%d FREQ=%.2f DUTY=%.2f\n", id, freq, duty);
-    }
-    else if (strncmp(cmd, "EN", 2) == 0)
-    {
-        enableAllDutyCycle();
-        xil_printf("ACK: ENABLED\n");
-    }
-    else if (strncmp(cmd, "DIS", 3) == 0)
-    {
-        disableAllDutyCycle();
-        xil_printf("ACK: DISABLED\n");
-    }
-    else
-    {
-        xil_printf("ERR: Unknown command\n");
-    }
-}
-
-void setPwmMode(uint8_t id, bool mode)
-{
-    Xil_Out32(PWM_ADDRESS[id] + 8, mode);
-}
 
 /**
  * @brief Get signed 13-bit value from packed buffer
@@ -1442,42 +1261,4 @@ static inline void put10s(uint8_t *buf, uint32_t index, int16_t value)
     buf[byte_offset + 1] = (cur >> 16) & 0xFF;
     buf[byte_offset + 2] = (cur >> 8)  & 0xFF;
     buf[byte_offset + 3] = cur & 0xFF;
-}
-
-
-
-void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B)
-{
-    uint32_t dataOut;
-    dataOut = LED<<24 | R<<16 | G<<8 | B;
-    Xil_Out32(XPAR_WS2812B_DRIVER_0_BASEADDR, dataOut);
-}
-
-
-
-#define REF_V 4680.0
-#define R1 24000
-float interpretTempearture(int16_t rawValue) {
-
-    //rawValue/(REF_V) = X/(X+R1);
-    //(rawValue/REF_V)*X +R1*(rawValue/REF_V)* = X
-    //X*(rawValue/REF_V - 1) = -R1*(rawValue/REF_V)
-    //X = -R1*(rawValue/REF_V) / (rawValue/REF_V - 1)
-    float X = -R1 * (rawValue / REF_V) / ((rawValue / REF_V) - 1);
-
-    float a = 639.5, b = -0.1332, c = -162.5;
-    float Temp = (a * pow(X, b) + c)*10;
-    //float Temp = 0;
-    // Assuming rawValue is a signed 11-bit integer representing temperature in °C with a scale factor of 0.125
-    return Temp;
-}
-
-float interpretMagneticField(int16_t rawValue)
-{
-    return (rawValue-2350)/0.73;
-}
-
-void updateTemperaturePL(uint8_t id, int32_t temperature)
-{
-    Xil_Out32(PWM_ADDRESS[id] + 12, temperature);
 }

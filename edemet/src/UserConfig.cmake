@@ -33,6 +33,7 @@ set(USER_COMPILE_SOURCES
 "W5100.c"
 "W5100dhcp.c"
 "ledButtontools.c"
+"magnetTools.c"
 )
 
 # -----------------------------------------

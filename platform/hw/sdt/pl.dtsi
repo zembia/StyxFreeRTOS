@@ -263,14 +263,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c00000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_0";
 		};
 		PWM_MagnetPWMController_1: MagnetPWMController@43c10000 {
@@ -278,14 +279,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c10000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_1";
 		};
 		PWM_MagnetPWMController_10: MagnetPWMController@43ca0000 {
@@ -293,14 +295,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43ca0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_10";
 		};
 		PWM_MagnetPWMController_11: MagnetPWMController@43cb0000 {
@@ -308,14 +311,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43cb0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_11";
 		};
 		PWM_MagnetPWMController_12: MagnetPWMController@43cc0000 {
@@ -323,14 +327,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43cc0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_12";
 		};
 		PWM_MagnetPWMController_13: MagnetPWMController@43cd0000 {
@@ -338,14 +343,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43cd0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_13";
 		};
 		PWM_MagnetPWMController_14: MagnetPWMController@43ce0000 {
@@ -353,14 +359,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43ce0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_14";
 		};
 		PWM_MagnetPWMController_15: MagnetPWMController@43cf0000 {
@@ -368,14 +375,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43cf0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_15";
 		};
 		PWM_MagnetPWMController_16: MagnetPWMController@43d00000 {
@@ -383,14 +391,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d00000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_16";
 		};
 		PWM_MagnetPWMController_17: MagnetPWMController@43d10000 {
@@ -398,14 +407,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d10000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_17";
 		};
 		PWM_MagnetPWMController_18: MagnetPWMController@43d20000 {
@@ -413,14 +423,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d20000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_18";
 		};
 		PWM_MagnetPWMController_19: MagnetPWMController@43d30000 {
@@ -428,14 +439,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d30000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_19";
 		};
 		PWM_MagnetPWMController_2: MagnetPWMController@43c20000 {
@@ -443,14 +455,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c20000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_2";
 		};
 		PWM_MagnetPWMController_20: MagnetPWMController@43d40000 {
@@ -458,14 +471,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d40000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_20";
 		};
 		PWM_MagnetPWMController_21: MagnetPWMController@43d50000 {
@@ -473,14 +487,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d50000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_21";
 		};
 		PWM_MagnetPWMController_22: MagnetPWMController@43d60000 {
@@ -488,14 +503,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d60000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_22";
 		};
 		PWM_MagnetPWMController_23: MagnetPWMController@43d70000 {
@@ -503,14 +519,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d70000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_23";
 		};
 		PWM_MagnetPWMController_24: MagnetPWMController@43d80000 {
@@ -518,14 +535,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d80000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_24";
 		};
 		PWM_MagnetPWMController_25: MagnetPWMController@43d90000 {
@@ -533,14 +551,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43d90000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_25";
 		};
 		PWM_MagnetPWMController_26: MagnetPWMController@43da0000 {
@@ -548,14 +567,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43da0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_26";
 		};
 		PWM_MagnetPWMController_27: MagnetPWMController@43db0000 {
@@ -563,14 +583,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43db0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_27";
 		};
 		PWM_MagnetPWMController_28: MagnetPWMController@43dc0000 {
@@ -578,14 +599,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43dc0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_28";
 		};
 		PWM_MagnetPWMController_29: MagnetPWMController@43dd0000 {
@@ -593,14 +615,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43dd0000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_29";
 		};
 		PWM_MagnetPWMController_3: MagnetPWMController@43c30000 {
@@ -608,14 +631,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c30000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_3";
 		};
 		PWM_MagnetPWMController_4: MagnetPWMController@43c40000 {
@@ -623,14 +647,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c40000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_4";
 		};
 		PWM_MagnetPWMController_5: MagnetPWMController@43c50000 {
@@ -638,14 +663,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c50000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_5";
 		};
 		PWM_MagnetPWMController_6: MagnetPWMController@43c60000 {
@@ -653,14 +679,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c60000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_6";
 		};
 		PWM_MagnetPWMController_7: MagnetPWMController@43c70000 {
@@ -668,14 +695,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c70000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_7";
 		};
 		PWM_MagnetPWMController_8: MagnetPWMController@43c80000 {
@@ -683,14 +711,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c80000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_8";
 		};
 		PWM_MagnetPWMController_9: MagnetPWMController@43c90000 {
@@ -698,14 +727,15 @@
 			xlnx,pwm-base-clk = <1000000>;
 			xlnx,clk-freq = <90000000>;
 			xlnx,s00-axi-data-width = <32>;
+			xlnx,temp-histeresis = <10>;
 			xlnx,ip-name = "MagnetPWMController";
 			reg = <0x43c90000 0x10000>;
 			clocks = <&misc_clk_0>, <&misc_clk_0>;
 			xlnx,temp-limit = <90>;
 			xlnx,edk-iptype = "PERIPHERAL";
 			status = "okay";
-			xlnx,s00-axi-addr-width = <6>;
 			clock-names = "PL_CLK" , "s00_axi_aclk";
+			xlnx,s00-axi-addr-width = <6>;
 			xlnx,name = "PWM_MagnetPWMController_9";
 		};
 		WS2812B_driver_0: WS2812B_driver@83c00000 {
