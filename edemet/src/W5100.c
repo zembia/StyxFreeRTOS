@@ -1084,10 +1084,6 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     uint32_t original_samples = vec_len;
     uint32_t target_samples = MAX_SAMPLES_PER_EM; // EM_PLAYBACK_SAMPLES;
 
-    // if (target_samples > MAX_SAMPLES_PER_EM) {
-    //     target_samples = MAX_SAMPLES_PER_EM;
-    // }
-
     uint32_t original_bytes = ((original_samples * 13) + 7) >> 3;
 
     // 1) Copy received packed data
@@ -1095,18 +1091,51 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
 
     // 2) Loop / expand samples in-place
     TickType_t timeSample = xTaskGetTickCount();
-    int16_t v;
 
-    TickType_t lastSleepTime = xTaskGetTickCount();
-    for (uint32_t i = original_samples; i < target_samples; i++) {
-      v = get13s(buf, i % original_samples);
-      put13s(buf, i, v);
-      if (xTaskGetTickCount()-lastSleepTime > MAX_CPU_HOG)
+    uint16_t *data = malloc(sizeof(uint16_t)*original_samples);
+
+    uint32_t bit_offset, byte_offset, bit_shift,raw,mask,cur;
+    uint16_t j;
+    bool first = true;
+    for (uint32_t i = original_samples,j=0,bit_offset=i*13; i < target_samples; i++,bit_offset=bit_offset+13) {
+      if (first)
       {
-        lastSleepTime = xTaskGetTickCount();
-        vTaskDelay(pdMS_TO_TICKS(1));
+        data[j] = get13s(buf, j);
       }
+      
+      if (j == original_samples-1)
+      {
+        j=0;
+        first = false;
+      }
+      else
+      {
+        j++;
+      }
+       
+      byte_offset = bit_offset >> 3;
+      bit_shift = bit_offset & 0x7;
+
+      raw = (uint16_t)data[j]& 0x1FFF;
+      // Align to MSB side of 32-bit window
+      raw <<= (19 - bit_shift);
+
+      mask = (uint32_t)0x1FFF << (19 - bit_shift);
+
+      cur = ((uint32_t)buf[byte_offset] << 24) |
+                    ((uint32_t)buf[byte_offset + 1] << 16) |
+                    ((uint32_t)buf[byte_offset + 2] << 8) |
+                    ((uint32_t)buf[byte_offset + 3]);
+
+      cur = (cur & ~mask) | raw;
+
+      buf[byte_offset] = (cur >> 24) & 0xFF;
+      buf[byte_offset + 1] = (cur >> 16) & 0xFF;
+      buf[byte_offset + 2] = (cur >> 8) & 0xFF;
+      buf[byte_offset + 3] = cur & 0xFF;
+
     }
+    free(data);
 
     // 3) Update vector length to expanded size
     em->vector_length = target_samples;
@@ -1708,7 +1737,7 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
                 bw_write(&bw, get11s(em_temp[i], j), 11);
                 bw_write(&bw, get11s(em_pwr[i], j), 11);
             }
-            bw_write(&bw,dummystart, 1);
+            bw_write(&bw,pause_vector_read_bit(j), 1);
             bw_write(&bw,get13s(cfle_pwr, j), 15);
         }
         // DBG

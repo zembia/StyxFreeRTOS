@@ -46,7 +46,7 @@ bool pcieStatus[30]={0};
 
 void vTaskPwm(void *pvParameters);
 int16_t get13s(const uint8_t *buf, uint32_t index);
-int16_t readADC(UINTPTR baseAddr);
+int16_t readADC(UINTPTR baseAddr, bool *valid);
 void read_all_em_analog_inputs(void);
 XGpio pwmEnableGpio;
 
@@ -64,6 +64,10 @@ uint8_t em_temp[NUM_EM][EM_TEMP_VECTOR_SIZE];
 
 __attribute__((section(".wave_buffers")))
 uint8_t cfle_pwr[CFL_POWER_VECTOR_SIZE];
+
+
+__attribute__((section(".wave_buffers")))
+uint8_t pause_vector[PAUSE_VECTOR_SIZE];
 
 bool outputsStatus = false;
 
@@ -94,6 +98,8 @@ static task_manager_t configN;
 // Read magnetic and temperature of each of the 5 EMs corresponding to the current I2C Port
 void vTaskMagnet(void *pvParameters)
 {        
+    int16_t tempAdcValue;
+    bool valid;
     // Extract the configuration
     task_manager_t *cfg = (task_manager_t *)pvParameters;
     operation_control_t *op = cfg->op;
@@ -185,8 +191,8 @@ void vTaskMagnet(void *pvParameters)
         // Start EM conversion of magnetic field (ADC)
         //xil_printf("[DBG] Starting mag conversions\r\n");
         once = true;
-        for (int ii=0; ii < 5; ii++) {
-
+        for (int ii=0; ii < 5; ii++) 
+        {
             if (mangetStatus[group_index*5+ii])
             {                
                 setIICmux(baseAddr, 1 << ii);
@@ -195,11 +201,14 @@ void vTaskMagnet(void *pvParameters)
                 {
                     vTaskDelay(pdMS_TO_TICKS(2));
                 }
-                op->em[group_index*5+ii].last_em_temp = interpretTempearture(readADC(baseAddr));
-                for (int i=0;i<30;i++)
+
+                tempAdcValue= readADC(baseAddr, &valid);
+                if (valid)
                 {
-                    updateTemperaturePL(i, op->em[group_index*5+ii].last_em_temp);//Update temp in hardware
+                    op->em[group_index*5+ii].last_em_temp = interpretTempearture(tempAdcValue);
+                    updateTemperaturePL(group_index*5+ii, op->em[group_index*5+ii].last_em_temp);//Update temp in hardware
                 }
+            
                 if (once)
                 {
                     lastADC_READ = xTaskGetTickCount();
@@ -246,7 +255,11 @@ void vTaskMagnet(void *pvParameters)
                 {
                     vTaskDelay(pdMS_TO_TICKS(2));
                 }
-                op->em[group_index*5+ii].last_em_measure = interpretMagneticField(readADC(baseAddr));
+                tempAdcValue= readADC(baseAddr, &valid);
+                if (valid)
+                {
+                    op->em[group_index*5+ii].last_em_measure = interpretMagneticField(tempAdcValue);                    
+                }
                 if (once)
                 {
                     lastADC_READ = xTaskGetTickCount();
@@ -631,9 +644,9 @@ void initReadADC(UINTPTR baseAddr, uint16_t channel) {
     }
 }
 
-int16_t readADC(UINTPTR baseAddr) {
+int16_t readADC(UINTPTR baseAddr, bool *valid) {
     
-
+    *valid = false;
     // Read Conversion Register (register 0x00)
     uint8_t reg = 0x00;    
     if (!I2C_SafeSend(baseAddr, 0x48, &reg, 1, XIIC_STOP)) {
@@ -651,6 +664,7 @@ int16_t readADC(UINTPTR baseAddr) {
     int16_t rawValue = (int16_t)((buf[0] << 8) | buf[1]);
     // xil_printf("buf bytes: %d %d\r\n", buf[0], buf[1]);
 
+    *valid = true;
     // 2. Convert to voltage
     return (float)rawValue * 0.125f;
 }
@@ -683,14 +697,21 @@ void vTaskPwm(void *pvParameters)
     for (int i=0;i<30;i++)
     {
         //setPwmMode(i,0);
-        setPwmFrequency(i,0.4); // 1 kHz
+        setPwmFrequency(i,1); // 1 kHz
         //setDutyCycle(i,50);
     }
    // vTaskDelay(portMAX_DELAY);
     disableAllDutyCycle();
 
     TickType_t lastWake = xTaskGetTickCount();
-    
+    /*vTaskDelay(pdMS_TO_TICKS(5000));
+    for (int i=0;i<30;i++)
+    {
+        if (mangetStatus[i])
+        {
+            calibrateMagnet(i,op);
+        }
+    }*/
 
     while (true)
     {
@@ -778,7 +799,7 @@ void vTaskPwm(void *pvParameters)
                     op->em[i].playbackIndex = (op->em[i].playbackIndex + 1) % op->em[i].vector_length;
                 }
 
-                // Save the last value measured to buffers
+                // Save the last value measured to buffers. This could be recicled in the previous loop
                 for (int j = 0; j < 6; j++) {
                     for (int i = 0; i < 5; i++){
                         put13s(op->em[j*5+i].em_measure, op->generalPlaybackIndex,op->em[j*5+i].last_em_measure);
@@ -786,7 +807,7 @@ void vTaskPwm(void *pvParameters)
                         put11s(op->em[j*5+i].em_pwr, op->generalPlaybackIndex,op->em[j*5+i].last_em_pwr);                
                     }
                 }
-                
+                pause_vector_write_bit(op->generalPlaybackIndex,0);
                 put10s(op->cfle_pwr, op->generalPlaybackIndex,op->last_cfle_pwr);                
                 
                 op->generalPlaybackIndex++;
@@ -847,7 +868,15 @@ void vTaskPwm(void *pvParameters)
                             setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
                         }
                     }
-                }
+
+                    op->em[id].playbackIndex = (op->em[id].playbackIndex + 1) % op->em[id].vector_length;
+                    put13s(op->em[id].em_measure, op->generalPlaybackIndex,op->em[id].last_em_measure);
+                    put11s(op->em[id].em_temp, op->generalPlaybackIndex,op->em[id].last_em_temp);
+                    put11s(op->em[id].em_pwr, op->generalPlaybackIndex,op->em[id].last_em_pwr);              
+                }                
+                put10s(op->cfle_pwr, op->generalPlaybackIndex,op->last_cfle_pwr);
+                pause_vector_write_bit(op->generalPlaybackIndex,1);
+                op->generalPlaybackIndex++;
 
                 break;
             default:
@@ -1060,7 +1089,7 @@ int main(void)
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMagnetF\r\n");
     }
-    taskStatus = xTaskCreate(vTaskPwm        , "Pwm"     , 2048  , &configI, tskIDLE_PRIORITY + 3, NULL);
+    taskStatus = xTaskCreate(vTaskPwm        , "Pwm"     , 2048  , &configI, tskIDLE_PRIORITY + 2, NULL);
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskPwm\r\n");
     }
@@ -1261,4 +1290,34 @@ static inline void put10s(uint8_t *buf, uint32_t index, int16_t value)
     buf[byte_offset + 1] = (cur >> 16) & 0xFF;
     buf[byte_offset + 2] = (cur >> 8)  & 0xFF;
     buf[byte_offset + 3] = cur & 0xFF;
+}
+
+
+
+void pause_vector_write_bit(uint32_t bit_pos, bool value)
+{
+    uint32_t byte_index = bit_pos >> 3;      // divide by 8
+    uint8_t  bit_index  = bit_pos & 0x07;    // mod 8
+
+    uint8_t mask = (1U << bit_index);
+
+    if (value)
+    {
+        pause_vector[byte_index] |= mask;    // Set bit
+    }
+    else
+    {
+        pause_vector[byte_index] &= ~mask;   // Clear bit
+    }
+}
+
+
+bool pause_vector_read_bit(uint32_t bit_pos)
+{
+    uint32_t byte_index = bit_pos >> 3;
+    uint8_t  bit_index  = bit_pos & 0x07;
+
+    uint8_t mask = (1U << bit_index);
+
+    return (pause_vector[byte_index] & mask) != 0;
 }

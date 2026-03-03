@@ -13,6 +13,7 @@
 #define BITS_MAGNETIC_FIELD 13
 #define BITS_TEMPERATURE 11
 #define BITS_POWER 11
+#define BITS_PAUSE 1
 
 #define MAX_PANEL_BRIGHTNESS 50
 
@@ -21,6 +22,7 @@
 #define EM_TEMP_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_TEMPERATURE/8
 #define EM_POWER_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_POWER/8
 #define CFL_POWER_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_CFL_POWER/8 
+#define PAUSE_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_PAUSE/8 
 
 // Command codes
 #define CMD_CODE_CONFIG         0x0001
@@ -71,7 +73,8 @@ int16_t get10s(const uint8_t *buf, uint32_t index);
 static inline void put10s(uint8_t *buf, uint32_t index, int16_t value);
 static inline void put11s(uint8_t *buf, uint32_t index, int16_t value);
 int16_t get11s(const uint8_t *buf, uint32_t index);
-
+void pause_vector_write_bit(uint32_t bit_pos, bool value);
+bool pause_vector_read_bit(uint32_t bit_pos);
 
 #define CRC_LEN 2
 #define SEND_PACKET_MAX_SIZE 1460-CRC_LEN

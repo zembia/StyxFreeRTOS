@@ -311,7 +311,13 @@ uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok, bool *pcie_status)
     for (i=0;i<5;i++)
     {
         
-        setIICmux(BaseAddress,1<<i);
+        if (setIICmux(BaseAddress,1<<i) != true)
+        {
+            printf("\tError setting IIC mux to channel %d\r\n",i);
+            everythingOK = false;
+            pciOk = false;
+            continue;
+        }
         printf("\tPort %d...\r\n",i);
 
         everythingOK = true;
@@ -339,12 +345,14 @@ uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok, bool *pcie_status)
     return 1;
 }
 
-void setIICmux(UINTPTR BaseAddress, uint8_t index)
+bool setIICmux(UINTPTR BaseAddress, uint8_t index)
 {
     if (!I2C_SafeSend(BaseAddress, TCA9548ARGER_ADDR, &index, 1, XIIC_STOP))
     {
         xil_printf("Error setting IIC mux\r\n");
+        return false;
     }
+    return true;
 }
 
 

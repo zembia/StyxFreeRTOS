@@ -54,7 +54,7 @@ bool ADS1115_ReadReg(UINTPTR BaseAddress, uint8_t DevAddr,
                      uint8_t Reg, uint16_t *Data);
 
 void checkAllI2CDevices(void);
-void setIICmux(UINTPTR BaseAddress, uint8_t index);
+bool setIICmux(UINTPTR BaseAddress, uint8_t index);
 bool checkPresence(UINTPTR BaseAddress, uint8_t deviceAddress);
 
 bool PCA9535_WriteReg(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t Reg, uint8_t Data);

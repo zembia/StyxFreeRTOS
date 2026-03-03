@@ -72,3 +72,50 @@ void setDutyCycle(uint8_t id, float dutyCycle)
     //printf("Set PWM N %u at %.2f %%. DC REG: %d. Timing REG: %d\n",id,dutyCycle,DC_REG, TIMING_REG);
 }
 
+
+
+void calibrateMagnet(uint8_t id, operation_control_t *op) 
+{
+    enableAllDutyCycle();
+   int16_t value1, value2;
+   xil_printf("Calibrating magnet %u\r\n", id);
+
+   //ramp up
+   for (int i=0;i<100;i=i+1)
+   {
+    setDutyCycle(id, i);
+    vTaskDelay(pdMS_TO_TICKS(2));
+   }
+   vTaskDelay(pdMS_TO_TICKS(10));
+   value1 = op->em[id].last_em_measure;
+
+   //ramp to rest
+   for (int i=100;i>0;i=i-1)
+   {
+    setDutyCycle(id, i);
+    vTaskDelay(pdMS_TO_TICKS(2));
+   }
+
+   //ramp down
+   for (int i=0;i>-100;i=i-1)
+   {
+    setDutyCycle(id, i);
+    vTaskDelay(pdMS_TO_TICKS(2));
+   }
+
+   vTaskDelay(pdMS_TO_TICKS(10));
+   value2 = op->em[id].last_em_measure;
+
+   //ramp to rest
+   for (int i=-100;i<0;i=i+1)
+   {
+    setDutyCycle(id, i);
+    vTaskDelay(pdMS_TO_TICKS(2));
+   }
+   disableAllDutyCycle();
+    float slope = (value2 - value1) / -200.0f; // 200 is the total change in duty cycle
+    float intercept = value1 - slope * 100; // Using the point (100, value1) to find the intercept
+    printf("Calibration result for magnet %u: slope = %.4f, intercept = %.2f\r\n", id, slope, intercept);
+    return;
+
+}
