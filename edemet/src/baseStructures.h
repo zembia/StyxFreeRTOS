@@ -16,6 +16,7 @@
 #define BITS_PAUSE 1
 
 #define MAX_PANEL_BRIGHTNESS 50
+#define MAX_PANEL_BRIGHTNESS_RED 10
 
 #define EM_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_MAGNETIC_FIELD/8 // size in bytes, not actually the number of samples
 #define EM_MEASURE_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_MAGNETIC_FIELD/8
@@ -145,6 +146,7 @@ typedef struct {
     uint32_t initialTimeTick;
     uint16_t signalSamplePeriodMs;      // Period of reproduction of the signal    
     uint32_t generalPlaybackIndex;
+    uint32_t pausePlaybackIndex;
     bool availableEms[NUM_EM];
     uint8_t *cfle_pwr;
     uint16_t last_cfle_pwr;

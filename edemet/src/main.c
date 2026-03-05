@@ -16,6 +16,7 @@
 #include "xiic_l.h"
 #include "xil_types.h"
 #include "math.h"
+#include "ledbuttontools.h"
 
 #include "magnetTools.h"
 
@@ -35,7 +36,7 @@ const uint32_t PWM_ADDRESS[30]={    XPAR_PWM_MAGNETPWMCONTROLLER_12_BASEADDR,XPA
                                     XPAR_PWM_MAGNETPWMCONTROLLER_11_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_8_BASEADDR,
                                     XPAR_PWM_MAGNETPWMCONTROLLER_5_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_0_BASEADDR
                             };                            
-void initReadADC(UINTPTR baseAddr, uint16_t channel);
+bool initReadADC(UINTPTR baseAddr, uint16_t channel);
 
 
 QueueHandle_t xQueue[6] = {NULL};
@@ -55,6 +56,9 @@ uint8_t em_ctrl[NUM_EM][EM_VECTOR_SIZE];
 
 __attribute__((section(".wave_buffers")))
 uint8_t em_measure[NUM_EM][EM_MEASURE_VECTOR_SIZE];
+
+__attribute__((section(".wave_buffers")))
+uint32_t em_ctrl_playback_trace[MAX_SAMPLES_PER_EM];
 
 __attribute__((section(".wave_buffers")))
 uint8_t em_pwr[NUM_EM][EM_POWER_VECTOR_SIZE];
@@ -158,7 +162,7 @@ void vTaskMagnet(void *pvParameters)
     uint32_t endTime;
     uint32_t difftime1 = 0, difftime2 = 0, difftime3 = 0;
 
-    uint8_t counter=0;
+    uint16_t counter=0;
     bool once;
     //we check the presence of every magnet
     
@@ -174,7 +178,7 @@ void vTaskMagnet(void *pvParameters)
             }
             else
             {
-                setledPanelColor(group_index*5+i, MAX_PANEL_BRIGHTNESS, 0, 0);
+                setledPanelColor(group_index*5+i, MAX_PANEL_BRIGHTNESS_RED, 0, 0);
             }
         }
         else
@@ -215,7 +219,9 @@ void vTaskMagnet(void *pvParameters)
                     once = false;
                 }
                 //initing magnetic field conversion
-                initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
+                while( initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD) == 0);            
+                
+                
                 
                 //Reading INA
                 uint8_t buf[3] = {0x08, 0x00, 0x00};
@@ -265,7 +271,7 @@ void vTaskMagnet(void *pvParameters)
                     lastADC_READ = xTaskGetTickCount();
                     once= false;
                 }
-                initReadADC(baseAddr, ADS1115_TEMP1); 
+                while( initReadADC(baseAddr, ADS1115_TEMP1) == 0);       
             }
             else
             {
@@ -274,7 +280,7 @@ void vTaskMagnet(void *pvParameters)
         }
 
 
-        if (++counter >=128)
+        if (++counter >=10)
         {
            if (group_index==0)
            {
@@ -458,16 +464,14 @@ void vTaskLed(void *pvParameters)
                 break;
 
             case STOP_STATE:
-                // Check if the operation is "Done" or just stopped
-                if (op->currentStage == STAGE_NONE && op->relativeTimeTick > 0) {
+                // Check if the operation is "Done" or just stopped                
+                currentPattern = noBlinkOff;
+                patternLen = 1;
+                break;
+            case DONE_STATE:
                     currentPattern = slowBlink;
                     patternLen = 20;
-                } else {
-                    currentPattern = noBlinkOff;
-                    patternLen = 1;
-                }
                 break;
-            
             default:
                 currentPattern = noBlinkOff;
                 patternLen = 1;
@@ -475,7 +479,7 @@ void vTaskLed(void *pvParameters)
         }
 
         op->operationLed = currentPattern[patternIdx];
-
+        setLedInd1State(op->operationLed);
         // 5. Increment and wrap the index
         patternIdx++;
         if (patternIdx >= patternLen) {
@@ -622,7 +626,7 @@ void vTaskMain(void *pvParameters)
     }
 }
 
-void initReadADC(UINTPTR baseAddr, uint16_t channel) {    
+bool initReadADC(UINTPTR baseAddr, uint16_t channel) {    
     // Build configuration (per datasheet Table 9)
     uint16_t config = ADS1115_OS_SINGLE |       // Start single conversion
                         channel |
@@ -641,7 +645,9 @@ void initReadADC(UINTPTR baseAddr, uint16_t channel) {
 
     if (!I2C_SafeSend(baseAddr, 0x48, write_buf, 3, XIIC_STOP)) {
         xil_printf("[ERROR] Failed to send ADC config\r\n");
+        return 0;
     }
+    return 1;
 }
 
 int16_t readADC(UINTPTR baseAddr, bool *valid) {
@@ -678,6 +684,7 @@ void vTaskPwm(void *pvParameters)
     function_state_t prevState = op->currentState;    
     function_state_t currentState = op->currentState;    
     uint32_t baseAddr = cfg->baseAddr;
+    uint32_t playbacksum;
 
     // Get task name (as you requested)
     char *pcTaskName = pcTaskGetName(NULL);
@@ -697,7 +704,7 @@ void vTaskPwm(void *pvParameters)
     for (int i=0;i<30;i++)
     {
         //setPwmMode(i,0);
-        setPwmFrequency(i,1); // 1 kHz
+        setPwmFrequency(i,0.25); // 1 kHz
         //setDutyCycle(i,50);
     }
    // vTaskDelay(portMAX_DELAY);
@@ -727,6 +734,7 @@ void vTaskPwm(void *pvParameters)
                 if (prevState != currentState){
                     if (prevState == STOP_STATE || prevState == DONE_STATE){
                         op->generalPlaybackIndex = 0;
+                        op->pausePlaybackIndex = 0;
                         op->initialTimeTick = xTaskGetTickCount();
                     }
                 }
@@ -799,16 +807,23 @@ void vTaskPwm(void *pvParameters)
                     op->em[i].playbackIndex = (op->em[i].playbackIndex + 1) % op->em[i].vector_length;
                 }
 
+                playbacksum = op->generalPlaybackIndex+op->pausePlaybackIndex;
+
+                if (playbacksum < MAX_SAMPLES_PER_EM)
+                {
+                    em_ctrl_playback_trace[playbacksum] = op->generalPlaybackIndex;
+                }
+
                 // Save the last value measured to buffers. This could be recicled in the previous loop
                 for (int j = 0; j < 6; j++) {
                     for (int i = 0; i < 5; i++){
-                        put13s(op->em[j*5+i].em_measure, op->generalPlaybackIndex,op->em[j*5+i].last_em_measure);
-                        put11s(op->em[j*5+i].em_temp, op->generalPlaybackIndex,op->em[j*5+i].last_em_temp);
-                        put11s(op->em[j*5+i].em_pwr, op->generalPlaybackIndex,op->em[j*5+i].last_em_pwr);                
+                        put13s(op->em[j*5+i].em_measure, playbacksum,op->em[j*5+i].last_em_measure);
+                        put11s(op->em[j*5+i].em_temp, playbacksum,op->em[j*5+i].last_em_temp);
+                        put11s(op->em[j*5+i].em_pwr, playbacksum,op->em[j*5+i].last_em_pwr);                
                     }
                 }
-                pause_vector_write_bit(op->generalPlaybackIndex,0);
-                put10s(op->cfle_pwr, op->generalPlaybackIndex,op->last_cfle_pwr);                
+                pause_vector_write_bit(playbacksum,0);
+                put10s(op->cfle_pwr, playbacksum,op->last_cfle_pwr);                
                 
                 op->generalPlaybackIndex++;
                 break;
@@ -833,7 +848,7 @@ void vTaskPwm(void *pvParameters)
                         }
                         else
                         {
-                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS_RED,0,0);
                         }
                     }
                 }
@@ -850,6 +865,13 @@ void vTaskPwm(void *pvParameters)
                 // Disable all the outputs
                 op->outputsStatus = false;
                 disableAllDutyCycle();
+                playbacksum = op->generalPlaybackIndex + op->pausePlaybackIndex;
+
+                if (playbacksum < MAX_SAMPLES_PER_EM)
+                {
+                    em_ctrl_playback_trace[playbacksum] = op->generalPlaybackIndex;
+                }
+
                 for (int id = 0; id < 30; id++)
                 {
                     setDutyCycle(id, 0);
@@ -865,19 +887,19 @@ void vTaskPwm(void *pvParameters)
                         }
                         else
                         {
-                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS,0,0);
+                            setledPanelColor(id,MAX_PANEL_BRIGHTNESS_RED,0,0);
                         }
                     }
-
-                    op->em[id].playbackIndex = (op->em[id].playbackIndex + 1) % op->em[id].vector_length;
-                    put13s(op->em[id].em_measure, op->generalPlaybackIndex,op->em[id].last_em_measure);
-                    put11s(op->em[id].em_temp, op->generalPlaybackIndex,op->em[id].last_em_temp);
-                    put11s(op->em[id].em_pwr, op->generalPlaybackIndex,op->em[id].last_em_pwr);              
+                    //don't increase playback index of magnets when paused
+                    //op->em[id].playbackIndex = (op->em[id].playbackIndex + 1) % op->em[id].vector_length;
+                    put13s(op->em[id].em_measure, playbacksum,op->em[id].last_em_measure);
+                    put11s(op->em[id].em_temp, playbacksum,op->em[id].last_em_temp);
+                    put11s(op->em[id].em_pwr, playbacksum,op->em[id].last_em_pwr);              
                 }                
-                put10s(op->cfle_pwr, op->generalPlaybackIndex,op->last_cfle_pwr);
-                pause_vector_write_bit(op->generalPlaybackIndex,1);
-                op->generalPlaybackIndex++;
-
+                put10s(op->cfle_pwr, playbacksum,op->last_cfle_pwr);
+                pause_vector_write_bit(playbacksum,1);
+                
+                op->pausePlaybackIndex++;
                 break;
             default:
                 break;
@@ -941,6 +963,7 @@ int main(void)
     op.availableEms[2] = true;
     memset(em_ctrl, 0, sizeof(em_ctrl));
     memset(em_measure, 0, sizeof(em_measure));
+    memset(em_ctrl_playback_trace, 0, sizeof(em_ctrl_playback_trace));
     memset(em_pwr, 0, sizeof(em_pwr));
     memset(em_temp, 0, sizeof(em_temp));
     memset(cfle_pwr, 0, sizeof(cfle_pwr));
@@ -1055,6 +1078,11 @@ int main(void)
     configL.baseAddr = NULL;
     configL.waitSem = semLtoM; 
     configL.signalSem = semMtoN;
+
+    configM.op = &op;
+    configM.baseAddr = XPAR_AXI_GPIO_0_BASEADDR;
+    configM.waitSem = NULL; 
+    configM.signalSem = NULL;
     BaseType_t taskStatus;
 
     taskStatus = xTaskCreate(vTaskIoExp      , "IoExp1"  , 128  , &configA, tskIDLE_PRIORITY + 1, NULL);// Needs at least more thatn 64 
@@ -1105,7 +1133,10 @@ int main(void)
     if (taskStatus != pdPASS) {
         xil_printf("Failed to create vTaskMain\r\n");
     }   
-
+    taskStatus = xTaskCreate(vTaskButtons       , "Buttons"    , 512  , &configM, tskIDLE_PRIORITY + 1, NULL);
+    if (taskStatus != pdPASS) {
+        xil_printf("Failed to create vTaskButtons\r\n");
+    }   
 
     for (int i=0;i<30;i++){
         setledPanelColor(i, 0, 0, 0); // Blue

@@ -14,7 +14,7 @@ static XGpio gpio_inst;
 void vTaskButtons(void *pvParameters)
 {
 
-    /*
+    
     task_manager_t *cfg = (task_manager_t *)pvParameters;
     uint32_t baseAddr = cfg->baseAddr;
     char *pcTaskName = pcTaskGetName(NULL);
@@ -26,7 +26,7 @@ void vTaskButtons(void *pvParameters)
     xil_printf("Starting %s at address 0x%08x\r\n", pcTaskName, baseAddr);   
 
     int status;
-    status = XGpio_Initialize(&gpio_inst, XPAR_AXI_GPIO_0_BASEADDR);
+    status = XGpio_Initialize(&gpio_inst, XPAR_AXI_GPIO_BTN_LED_BASEADDR);
     if (status != XST_SUCCESS)
     {
         perror("GPIO Initialization Failed\r\n");
@@ -42,7 +42,7 @@ void vTaskButtons(void *pvParameters)
                                 (0 << LED_IND1) | 
                                 (0 << LED_IND2);
                             
-    XGpio_SetDataDirection(&gpio_inst, PWM_FAN_CTRL, direction_mask); // Set PWM_FAN_CTRL as output
+    XGpio_SetDataDirection(&gpio_inst, 1, direction_mask); // Set PWM_FAN_CTRL as output
     TickType_t lastWake = xTaskGetTickCount();
 
 
@@ -52,6 +52,10 @@ void vTaskButtons(void *pvParameters)
 
     uint8_t green_last_sample = green_sample;
     uint8_t red_last_sample = red_sample;
+
+    if (cfg->signalSem != NULL) {
+        xSemaphoreGive(cfg->signalSem);
+    }
 
     while(1)
     {
@@ -77,7 +81,7 @@ void vTaskButtons(void *pvParameters)
             //do something
         }        
     }
-    */
+    
 }
 
 

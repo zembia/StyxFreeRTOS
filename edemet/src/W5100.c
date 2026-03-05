@@ -851,122 +851,6 @@ static void unpack_13bit_values(const uint8_t *packed, uint16_t *unpacked,
   }
 }
 
-/**
- * @brief Process command 0x0002: Vector + Header
- * @param op: Operation control structure
- * @param data: Complete command data (header + vector)
- * @param total_length: Total length of data
- * @return Response code
- */
-/*
-static uint8_t process_vector_header_cmd(operation_control_t *op, const uint8_t
-*data, uint32_t total_length)
-{
-   // Minimum length check (header only = 19 bytes)
-   if (total_length < 19) {
-       xil_printf("ERROR: Command 0x0002 too short (%d bytes)\r\n",
-total_length); return RESPONSE_ERROR_VECTOR_TOO_LARGE;
-   }
-
-   // Parse header (skip first 2 bytes which are the command code)
-   uint8_t ring = data[2];
-   uint8_t em_idx = data[3];
-   uint8_t mode = data[4];
-   uint8_t type = data[5];
-   uint8_t duty = data[6];
-   uint8_t freq_val = data[7];
-   int16_t offset = read_i16_be(&data[8]);
-   int16_t amplitude = read_i16_be(&data[10]);
-   uint8_t static_mode = data[12];
-   uint8_t frot_val = data[13];
-   uint8_t cols = data[14];
-   uint32_t vec_len = read_u32_be(&data[15]);
-
-   // Validate parameters
-   if (ring > 2) {
-       xil_printf("ERROR: Invalid ring %d (must be 0-2)\r\n", ring);
-       return RESPONSE_ERROR_INVALID_RING;
-   }
-
-   if (em_idx > 9) {
-       xil_printf("ERROR: Invalid EM index %d (must be 0-9)\r\n", em_idx);
-       return RESPONSE_ERROR_INVALID_EM;
-   }
-
-   if (mode > 1) {
-       xil_printf("ERROR: Invalid mode %d (must be 0-1)\r\n", mode);
-       return RESPONSE_ERROR_INVALID_MODE;
-   }
-
-   if (vec_len > MAX_SAMPLES_PER_EM) {
-       xil_printf("ERROR: Vector too large %d (max %d)\r\n", vec_len,
-MAX_SAMPLES_PER_EM); return RESPONSE_ERROR_VECTOR_TOO_LARGE;
-   }
-
-   // Calculate expected vector size in bytes
-   uint32_t num_groups = (vec_len + 7) / 8;  // ceil(vec_len / 8)
-   uint32_t expected_vector_bytes = num_groups * 13;
-   uint32_t expected_total_bytes = 19 + expected_vector_bytes;
-
-   if (total_length < expected_total_bytes) {
-       xil_printf("ERROR: Incomplete vector data. Expected %d bytes, got
-%d\r\n", expected_total_bytes, total_length); return
-RESPONSE_ERROR_VECTOR_TOO_LARGE;
-   }
-
-   // Calculate actual EM array index (ring * 10 + em_idx)
-   uint8_t em_array_idx = ring * 10 + em_idx;
-
-   if (em_array_idx >= NUM_EM) {
-       xil_printf("ERROR: Computed EM index %d exceeds array size %d\r\n",
-                  em_array_idx, NUM_EM);
-       return RESPONSE_ERROR_INVALID_EM;
-   }
-
-   xil_printf("=== Parsing Vector Header Command ===\r\n");
-   xil_printf("Ring: %d, EM: %d (Array index: %d)\r\n", ring, em_idx,
-em_array_idx); xil_printf("Mode: %d, Type: %d, Duty: %d%%\r\n", mode, type,
-duty); xil_printf("Freq: %.1f Hz, Offset: %d, Amplitude: %d\r\n", freq_val
-/ 10.0, offset, amplitude); xil_printf("Static mode: %d, Rot freq: %.1f Hz,
-Cols: %d\r\n", static_mode, frot_val / 10.0, cols); xil_printf("Vector length:
-%d values (%d bytes packed)\r\n", vec_len, expected_vector_bytes);
-
-   // Acquire mutex for thread-safe access
-   xSemaphoreTake(op->mutex, portMAX_DELAY);
-
-   // Update EM configuration
-   em_t *em = &op->em[em_array_idx];
-
-   em->ring_idx = ring;
-   em->em_idx = em_idx;
-   em->mode = mode;
-   em->type = type;
-   em->duty_cycle = duty;
-   em->frequency_factor = freq_val;
-   em->magnetic_field_offset = offset;
-   em->magnetic_field_amplitude = amplitude;
-   em->static_mode = static_mode;
-   em->rotational_frequency_factor = frot_val;
-   em->coils_columns = cols;
-   em->vector_length = vec_len;
-   em->playbackIndex = 0;
-
-   // Store packed vector data directly (no unpacking to save memory)
-   if (vec_len > 0 && em->em_ctrl != NULL) {
-       // Copy packed data directly to em_ctrl buffer
-       memcpy(em->em_ctrl, &data[19], expected_vector_bytes);
-
-       xil_printf("Stored %d bytes of packed vector data\r\n",
-expected_vector_bytes);
-   }
-
-   xSemaphoreGive(op->mutex);
-
-   xil_printf("=== Vector Header Command Complete ===\r\n");
-
-   return RESPONSE_SUCCESS;
-}
-*/
 
 /**
  * @brief Process command 0x0002: Vector + Header
@@ -1044,18 +928,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
                em_array_idx, NUM_EM);
     return RESPONSE_ERROR_INVALID_EM;
   }
-  /*
-  xil_printf("=== Parsing Vector Header Command ===\r\n");
-  xil_printf("Ring: %d, EM: %d (Array index: %d)\r\n", ring, em_idx,
-             em_array_idx);
-  xil_printf("Mode: %d, Type: %d, Duty: %d%%\r\n", mode, type, duty);
-  xil_printf("Freq: %.1f Hz, Offset: %d, Amplitude: %d\r\n", freq_val / 10.0,
-             offset, amplitude);
-  xil_printf("Static mode: %d, Rot freq: %.1f Hz, Cols: %d\r\n", static_mode,
-             frot_val / 10.0, cols);
-  xil_printf("Vector length: %d values (%d bytes packed)\r\n", vec_len,
-             expected_vector_bytes);
-  */
+
   // Acquire mutex for thread-safe access
   xSemaphoreTake(op->mutex, portMAX_DELAY);
 
@@ -1092,35 +965,27 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     // 2) Loop / expand samples in-place
     TickType_t timeSample = xTaskGetTickCount();
 
-    uint16_t *data = malloc(sizeof(uint16_t)*original_samples);
+    uint16_t *data2 = malloc(sizeof(uint16_t)*original_samples);
 
     uint32_t bit_offset, byte_offset, bit_shift,raw,mask,cur;
     uint16_t j;
+    uint32_t shift;
     bool first = true;
     for (uint32_t i = original_samples,j=0,bit_offset=i*13; i < target_samples; i++,bit_offset=bit_offset+13) {
       if (first)
       {
-        data[j] = get13s(buf, j);
-      }
+        data2[j] = get13s(&data[20], j);
+      }    
       
-      if (j == original_samples-1)
-      {
-        j=0;
-        first = false;
-      }
-      else
-      {
-        j++;
-      }
-       
       byte_offset = bit_offset >> 3;
       bit_shift = bit_offset & 0x7;
 
-      raw = (uint16_t)data[j]& 0x1FFF;
+      raw = (uint16_t)data2[j]& 0x1FFF;
       // Align to MSB side of 32-bit window
-      raw <<= (19 - bit_shift);
+      shift = 19-bit_shift;
+      raw <<=shift;
 
-      mask = (uint32_t)0x1FFF << (19 - bit_shift);
+      mask = (uint32_t)0x1FFF << shift;
 
       cur = ((uint32_t)buf[byte_offset] << 24) |
                     ((uint32_t)buf[byte_offset + 1] << 16) |
@@ -1134,8 +999,25 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
       buf[byte_offset + 2] = (cur >> 8) & 0xFF;
       buf[byte_offset + 3] = cur & 0xFF;
 
+
+      if (j == original_samples-1)
+      {
+        j=0;
+        first = false;
+      }
+      else
+      {
+        j++;
+      }
     }
-    free(data);
+    free(data2);
+    /*
+    int16_t v;
+    for (uint32_t i = original_samples;i<target_samples;i++)
+    {
+      v=get13s(buf, i%original_samples);
+      put13s(buf,i,v);      
+    }*/
 
     // 3) Update vector length to expanded size
     em->vector_length = target_samples;
@@ -1145,6 +1027,7 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     xil_printf(
         "Stored %d samples (%d bytes packed, looped from %d samples). Took %d ms\r\n",
         target_samples, total_bytes, original_samples, xTaskGetTickCount()-timeSample);
+    
   }
 
   xSemaphoreGive(op->mutex);
@@ -1264,6 +1147,7 @@ static void TCP_Server_Task(void *pvParameters) {
             response[1] = 0;
             response[2] = RESPONSE_ERROR_INVALID_CRC;
             response_length = 3;
+            break;
           case CMD_CODE_PLAY:
             // PLAY
             xil_printf("Play cmd\r\n");
@@ -1271,6 +1155,7 @@ static void TCP_Server_Task(void *pvParameters) {
             if (op->currentState == STOP_STATE )
             {
               op->generalPlaybackIndex = 0;
+              op->pausePlaybackIndex = 0;
             }
             op->cmd = CMD_PLAY;
             xSemaphoreGive(op->mutex);
@@ -1659,6 +1544,8 @@ extern uint8_t em_temp[NUM_EM][EM_TEMP_VECTOR_SIZE];
 
 extern uint8_t cfle_pwr[CFL_POWER_VECTOR_SIZE];
 
+extern uint32_t em_ctrl_playback_trace[MAX_SAMPLES_PER_EM];
+
 
 
 
@@ -1696,11 +1583,11 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
     //translatin miliseconds to sample:
     uint32_t realStartIndex,realEndIndex;
     realStartIndex = start;
-    realEndIndex = realStartIndex+6;
+    realEndIndex = realStartIndex+7;
     
-    if (realEndIndex>  op->generalPlaybackIndex)
+    if (realEndIndex>  op->generalPlaybackIndex+op->pausePlaybackIndex)
     {
-        realEndIndex = op->generalPlaybackIndex;
+        realEndIndex = op->generalPlaybackIndex+op->pausePlaybackIndex;
     }
 
     if ((((realEndIndex-realStartIndex)*SAMPLE_SIZE+3)>SEND_PACKET_MAX_SIZE) &&  (start != 0xFFFFFFFF))
@@ -1721,7 +1608,8 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
       debug_data++;
     #endif
 
-    
+    bool pauseStatus;
+    uint32_t ctrl_index;
     if (start != 0xFFFFFFFF)
     {
         buffer_reply[3] = ((start) >> 24) & 0xFF;
@@ -1730,14 +1618,30 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
         buffer_reply[6] =  (start) & 0xFF;
         for (int j= realStartIndex; j<realEndIndex;j++)
         {    
+            pauseStatus = pause_vector_read_bit(j);
+            ctrl_index = em_ctrl_playback_trace[j];
             for (int i=0;i<30;i++)
             {
-                bw_write(&bw, get13s(em_ctrl[i], j), 13); 
+                if (pauseStatus)
+                {
+                  bw_write(&bw, 0, 13);   
+                }
+                else
+                {
+                  if (ctrl_index < MAX_SAMPLES_PER_EM)
+                  {
+                    bw_write(&bw, get13s(em_ctrl[i], ctrl_index), 13);
+                  }
+                  else
+                  {
+                    bw_write(&bw, 0, 13);
+                  }
+                }
                 bw_write(&bw, get13s(em_measure[i], j), 13); 
                 bw_write(&bw, get11s(em_temp[i], j), 11);
                 bw_write(&bw, get11s(em_pwr[i], j), 11);
             }
-            bw_write(&bw,pause_vector_read_bit(j), 1);
+            bw_write(&bw,pauseStatus, 1);
             bw_write(&bw,get13s(cfle_pwr, j), 15);
         }
         // DBG
@@ -1750,7 +1654,7 @@ uint16_t buildPacket(uint32_t start, uint8_t *buffer_reply,operation_control_t *
     else
     {
         uint32_t time;
-        time = op->generalPlaybackIndex;
+        time = op->generalPlaybackIndex+op->pausePlaybackIndex;
         buffer_reply[3] = ((time) >> 24) & 0xFF;
         buffer_reply[4] = ((time) >> 16) & 0xFF;
         buffer_reply[5] = ((time) >> 8) & 0xFF;

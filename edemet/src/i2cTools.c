@@ -802,9 +802,10 @@ static unsigned SendData(UINTPTR BaseAddress, u8 *BufferPtr,
 		 * Wait for the transmit to be empty before sending any more
 		 * data by polling the interrupt status register
 		 */
-		while (1) {
+         lastTimer = xTaskGetTickCount();
+		while ((xTaskGetTickCount()-lastTimer<HANG_LIMIT)) {
 			IntrStatus = XIic_ReadIisr(BaseAddress);
-
+            //implementar timer hangout
 			if (IntrStatus & (XIIC_INTR_TX_ERROR_MASK |
 					  XIIC_INTR_ARB_LOST_MASK |
 					  XIIC_INTR_BNB_MASK)) {
@@ -815,6 +816,10 @@ static unsigned SendData(UINTPTR BaseAddress, u8 *BufferPtr,
 				break;
 			}
 		}
+        if (xTaskGetTickCount()-lastTimer >= HANG_LIMIT)
+        {
+            return originalByteCount;
+        }
 		/* If there is more than one byte to send then put the
 		 * next byte to send into the transmit FIFO
 		 */
@@ -1061,6 +1066,7 @@ static unsigned RecvData(UINTPTR BaseAddress, u8 *BufferPtr,
 		 * complete by checking the interrupt status register of the
 		 * IPIF
 		 */
+        lastTimer = xTaskGetTickCount();
 		while (1) {
 			IntrStatus = XIic_ReadIisr(BaseAddress);
 			if (IntrStatus & XIIC_INTR_RX_FULL_MASK) {
@@ -1074,6 +1080,11 @@ static unsigned RecvData(UINTPTR BaseAddress, u8 *BufferPtr,
 			if (IntrStatus & IntrStatusMask) {
 				return ByteCount;
 			}
+
+            if (xTaskGetTickCount()-lastTimer>=HANG_LIMIT)
+            {
+                return original_bytes;
+            }
 		}
 
 		CntlReg = XIic_ReadReg(BaseAddress,  XIIC_CR_REG_OFFSET);
