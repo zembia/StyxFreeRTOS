@@ -960,7 +960,10 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     uint32_t original_bytes = ((original_samples * 13) + 7) >> 3;
 
     // 1) Copy received packed data
-    memcpy(buf, &data[20], original_bytes);
+    if ((op->currentState != PLAY_STATE) && (op->currentState != PAUSE_STATE))
+    {
+      memcpy(buf, &data[20], original_bytes);
+    }
 
     // 2) Loop / expand samples in-place
     TickType_t timeSample = xTaskGetTickCount();
@@ -971,7 +974,17 @@ static uint8_t process_vector_header_cmd(operation_control_t *op,
     uint16_t j;
     uint32_t shift;
     bool first = true;
-    for (uint32_t i = original_samples,j=0,bit_offset=i*13; i < target_samples; i++,bit_offset=bit_offset+13) {
+    uint32_t init_i;
+
+    if ((op->currentState == PLAY_STATE) || (op->currentState == PAUSE_STATE))
+    {
+      init_i = op->generalPlaybackIndex;
+    }
+    else
+    {
+      init_i = original_samples;
+    }
+    for (uint32_t i = init_i,j=0,bit_offset=i*13; i < target_samples; i++,bit_offset=bit_offset+13) {
       if (first)
       {
         data2[j] = get13s(&data[20], j);
@@ -1182,6 +1195,7 @@ static void TCP_Server_Task(void *pvParameters) {
           xil_printf("Stop cmd\r\n");
           xSemaphoreTake(op->mutex, portMAX_DELAY);
           op->cmd = CMD_STOP;
+          op->relativeTimeTick;      
           xSemaphoreGive(op->mutex);
 
           response[0] = (cmd & 0xFF00) >> 8;

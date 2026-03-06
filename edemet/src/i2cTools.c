@@ -25,6 +25,8 @@
 #define IOEXP2_ADDR 0x21
 #define IOEXP3_ADDR 0x22
 
+uint8_t globalretries = 3;
+
 uint8_t ioexp_addr[]={IOEXP1_ADDR,IOEXP2_ADDR,IOEXP3_ADDR};
 static unsigned XIic_Send_custom(UINTPTR BaseAddress, u8 Address,
 		   u8 *BufferPtr, unsigned ByteCount, u8 Option);
@@ -61,7 +63,7 @@ void I2C_ResetBus(UINTPTR BaseAddress) {
     xil_printf("Timing TLOW    reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x140));
     xil_printf("Timing THDDAT     reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x144));
 */
-    vTaskDelay(pdMS_TO_TICKS(10));
+    //vTaskDelay(pdMS_TO_TICKS(10));
     uint32_t CntlReg = XIic_ReadReg(BaseAddress,  XIIC_CR_REG_OFFSET);
     CntlReg = XIIC_CR_MSMS_MASK | XIIC_CR_ENABLE_DEVICE_MASK;		
     //XIic_WriteReg(BaseAddress,  XIIC_CR_REG_OFFSET, CntlReg);
@@ -82,7 +84,7 @@ void I2C_ResetBus(UINTPTR BaseAddress) {
 bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option) {
     //return XIic_Send_custom(BaseAddress,DevAddr,data,len,option);
 
-    int retries = 3;
+    int retries = globalretries;
     
     while (retries-- > 0) {
         // Check if bus is stuck
@@ -137,7 +139,7 @@ bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t l
  * @brief Safe I2C receive with timeout and error recovery
  */
 bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t len, uint8_t option) {
-    int retries = 3;
+    int retries = globalretries;
     
     while (retries-- > 0) {
         // Check if bus is stuck
@@ -215,6 +217,18 @@ bool PCA9535_ReadReg(UINTPTR BaseAddress, uint8_t DevAddr,
         return false;
 
     if (XIic_Recv_custom(BaseAddress, DevAddr, Data, 1, XIIC_STOP) != 1)
+        return false;
+
+    return true;
+}
+
+
+bool INA_readReg(UINTPTR BaseAddress, uint8_t Reg, uint8_t *Data, uint8_t len)
+{
+    if (XIic_Send_custom(BaseAddress, INA740_ADDR, &Reg, 1, XIIC_REPEATED_START) != 1)
+        return false;
+
+    if (XIic_Recv_custom(BaseAddress, INA740_ADDR, Data, len, XIIC_STOP) != len)
         return false;
 
     return true;
@@ -856,6 +870,7 @@ static unsigned SendData(UINTPTR BaseAddress, u8 *BufferPtr,
 				 * Wait for the transmit to be empty before
 				 * setting RSTA bit.
 				 */
+                 lastTimer = xTaskGetTickCount();
 				while (1) {
 					IntrStatus =
 						XIic_ReadIisr(BaseAddress);
@@ -874,6 +889,10 @@ static unsigned SendData(UINTPTR BaseAddress, u8 *BufferPtr,
 						   XIIC_CR_MSMS_MASK);
 						break;
 					}
+                      if (xTaskGetTickCount()-lastTimer >= HANG_LIMIT)
+                        {
+                            return originalByteCount;
+                        }
 				}
 			}
 		}
@@ -1277,4 +1296,10 @@ unsigned XIic_Recv_custom(UINTPTR BaseAddress, u8 Address,
 
 	/* Return the number of bytes that was received */
 	return ByteCount - RemainingByteCount;
+}
+
+void initINA(UINTPTR BaseAddres)
+{
+    uint8_t buf[3] = {0x01,0xF0,0x04};
+    I2C_SafeSend(BaseAddres, 0x40, buf, 3, XIIC_STOP);
 }

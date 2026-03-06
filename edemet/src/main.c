@@ -19,6 +19,7 @@
 #include "ledbuttontools.h"
 
 #include "magnetTools.h"
+extern uint8_t globalretries;
 
 const uint32_t PWM_ADDRESS[30]={    XPAR_PWM_MAGNETPWMCONTROLLER_12_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_9_BASEADDR,
                                     XPAR_PWM_MAGNETPWMCONTROLLER_6_BASEADDR,XPAR_PWM_MAGNETPWMCONTROLLER_3_BASEADDR,
@@ -99,11 +100,56 @@ static task_manager_t configM;
 static task_manager_t configN;
 
 
+typedef struct
+{
+    float gain;
+    float P;
+    float Q;
+    float R;
+} gain_kalman_t;
+
+gain_kalman_t gain_kalman[NUM_EM];  
+float lastEmControl[NUM_EM]={0};
+
+
+void gain_kalman_update(gain_kalman_t *kf,
+                        float setPoint,
+                        float measuredField)
+{   
+    static uint8_t counter = 0;
+    float realsetpoint = setPoint/kf->gain;
+
+    if (fabs(realsetpoint) < 20)
+        return;
+
+    float alpha = 0.001f;   // slow adaptation
+
+    static float num = 0;
+    static float den = 0;
+
+    float predictedMeasurement = realsetpoint;
+    float error = predictedMeasurement-measuredField;
+    float tempGain = kf->gain*(1-alpha) + alpha * error/realsetpoint; 
+
+    if (tempGain < 0.0033333) tempGain = 0.0033333; // prevent too low gain
+    if (tempGain > 0.33333) tempGain = 0.33333; // prevent too high gain
+    kf->gain = tempGain;
+
+    if (counter++==32)
+    {
+        counter = 0;
+        printf("gain for EM: %f, setpoint: %f, measured: %f\r\n", kf->gain, realsetpoint, measuredField);
+    }
+
+}
+
+
+
 // Read magnetic and temperature of each of the 5 EMs corresponding to the current I2C Port
 void vTaskMagnet(void *pvParameters)
 {        
     int16_t tempAdcValue;
-    bool valid;
+    bool valid1;
     // Extract the configuration
     task_manager_t *cfg = (task_manager_t *)pvParameters;
     operation_control_t *op = cfg->op;
@@ -164,6 +210,8 @@ void vTaskMagnet(void *pvParameters)
 
     uint16_t counter=0;
     bool once;
+    bool magnetReadStartedOk[5] = {true, true, true, true, true};
+    bool TempReadStartedOk[5] = {true, true, true, true, true};
     //we check the presence of every magnet
     
     checkIICchannel(baseAddr,&mangetStatus[group_index*5],&pcieStatus[group_index*5]);
@@ -184,6 +232,13 @@ void vTaskMagnet(void *pvParameters)
         else
         {
             setledPanelColor(group_index*5+i, 0, MAX_PANEL_BRIGHTNESS, 0);
+            setIICmux(baseAddr, 1 << i);
+            initINA(baseAddr);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            uint16_t tempData;
+            INA_readReg(baseAddr,0x05,&tempData,2);
+            xil_printf("Read Voltaje: %X",tempData);
+
         }
     }
 
@@ -201,16 +256,20 @@ void vTaskMagnet(void *pvParameters)
             {                
                 setIICmux(baseAddr, 1 << ii);
                 //Reading temperature converted in last loop
+
                 if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
                 {
                     vTaskDelay(pdMS_TO_TICKS(2));
                 }
-
-                tempAdcValue= readADC(baseAddr, &valid);
-                if (valid)
+                //only read if the previous conversion was started ok, otherwise we would be reading magnet data instead of temp.
+                if (TempReadStartedOk[ii] == true)
                 {
-                    op->em[group_index*5+ii].last_em_temp = interpretTempearture(tempAdcValue);
-                    updateTemperaturePL(group_index*5+ii, op->em[group_index*5+ii].last_em_temp);//Update temp in hardware
+                    tempAdcValue= readADC(baseAddr, &valid1);
+                    if (valid1)
+                    {                    
+                        op->em[group_index*5+ii].last_em_temp = interpretTempearture(tempAdcValue);
+                        updateTemperaturePL(group_index*5+ii, op->em[group_index*5+ii].last_em_temp);//Update temp in hardware
+                    }
                 }
             
                 if (once)
@@ -219,28 +278,23 @@ void vTaskMagnet(void *pvParameters)
                     once = false;
                 }
                 //initing magnetic field conversion
-                while( initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD) == 0);            
+                magnetReadStartedOk[ii] = initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
                 
                 
                 
                 //Reading INA
                 uint8_t buf[3] = {0x08, 0x00, 0x00};
-                // Set the pointer to power register
-                if (!I2C_SafeSend(baseAddr, 0x40, buf, 1, XIIC_STOP)) {
-                    xil_printf("[ERROR] Failed to set INA register for EM %d\r\n", ii);
-                    op->em[group_index*5+ii].last_em_pwr = 0;
-                    continue;
-                }
-                
-                //xil_printf("[DBG] Power sensor %d - receiving data\r\n", i);
-                // Read voltage
-                if (!I2C_SafeRecv(baseAddr, 0x40, buf, 3, XIIC_STOP)) {
+
+
+                if (!INA_readReg(baseAddr,0x08,buf,3))
+                {
                     xil_printf("[ERROR] Failed to read INA data for EM %d\r\n", ii);
-                    op->em[group_index*5+ii].last_em_pwr = 0;
+                    //op->em[group_index*5+ii].last_em_pwr = 0;
                     continue;
                 }
+
                 // Save EM power
-                op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/1000000;
+                op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/250000;
             }
             else
             {
@@ -255,23 +309,26 @@ void vTaskMagnet(void *pvParameters)
         for (int ii=0; ii < 5; ii++) {
             if (mangetStatus[group_index*5+ii])
             {
-                
-                setIICmux(baseAddr, 1 << ii);
-                if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
-                {
-                    vTaskDelay(pdMS_TO_TICKS(2));
-                }
-                tempAdcValue= readADC(baseAddr, &valid);
-                if (valid)
-                {
-                    op->em[group_index*5+ii].last_em_measure = interpretMagneticField(tempAdcValue);                    
+                if (magnetReadStartedOk[ii] == true)
+                {                
+                    setIICmux(baseAddr, 1 << ii);
+                    if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
+                    {
+                        vTaskDelay(pdMS_TO_TICKS(2));
+                    }
+                    tempAdcValue= readADC(baseAddr, &valid1);
+                    if (valid1)
+                    {
+                        op->em[group_index*5+ii].last_em_measure = interpretMagneticField(tempAdcValue);                                            
+                        gain_kalman_update(&gain_kalman[group_index*5+ii], lastEmControl[group_index*5+ii], op->em[group_index*5+ii].last_em_measure);
+                    }
                 }
                 if (once)
                 {
                     lastADC_READ = xTaskGetTickCount();
                     once= false;
                 }
-                while( initReadADC(baseAddr, ADS1115_TEMP1) == 0);       
+                TempReadStartedOk[ii] = initReadADC(baseAddr, ADS1115_TEMP1);
             }
             else
             {
@@ -280,7 +337,7 @@ void vTaskMagnet(void *pvParameters)
         }
 
 
-        if (++counter >=10)
+        if (++counter >=1000)
         {
            if (group_index==0)
            {
@@ -630,7 +687,7 @@ bool initReadADC(UINTPTR baseAddr, uint16_t channel) {
     // Build configuration (per datasheet Table 9)
     uint16_t config = ADS1115_OS_SINGLE |       // Start single conversion
                         channel |
-                        ADS1115_PGA_4_096V |      // ±4.096V range
+                        ADS1115_PGA_6_144V |      // ±4.096V range
                         ADS1115_MODE_SINGLE |     // Single-shot mode
                         ADS1115_DR_860SPS |       // 860 SPS
                         ADS1115_COMP_QUE_DISABLE; // Disable comparator
@@ -647,6 +704,27 @@ bool initReadADC(UINTPTR baseAddr, uint16_t channel) {
         xil_printf("[ERROR] Failed to send ADC config\r\n");
         return 0;
     }
+    uint16_t recvBuf;
+    if (!I2C_SafeRecv(baseAddr, 0x48, &recvBuf, 2, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to read ADC config\r\n");
+        return 0;
+    }
+    uint16_t flip_recvBuf = recvBuf << 8 | recvBuf >> 8;
+
+    bool conversionStarted = (flip_recvBuf&0x8000) == 0;
+    if (conversionStarted == false)
+    {
+        xil_printf("[ERROR] conversion did not start\r\n");
+        return 0;
+    }
+
+    if ((flip_recvBuf & 0x7000) != (config & 0x7000))
+    {
+        xil_printf("[ERROR] ADC channel not changed succesfully\r\n");
+        return 0;
+    }
+    
+
     return 1;
 }
 
@@ -660,19 +738,30 @@ int16_t readADC(UINTPTR baseAddr, bool *valid) {
         return 0;
     }
     
-    uint8_t buf[2];
-    if (!I2C_SafeRecv(baseAddr, 0x48, buf, 2, XIIC_STOP)) {
-        xil_printf("[ERROR] Failed to read ADC data\r\n");
+    uint8_t buf1[2];
+    uint8_t buf2[2];
+    if (!I2C_SafeRecv(baseAddr, 0x48, buf1, 2, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to read ADC data #1\r\n");
         return 0;
     }
 
-    // 1. Combine bytes into a temporary 16-bit integer
-    int16_t rawValue = (int16_t)((buf[0] << 8) | buf[1]);
-    // xil_printf("buf bytes: %d %d\r\n", buf[0], buf[1]);
+    if (!I2C_SafeRecv(baseAddr, 0x48, buf2, 2, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to read ADC data #2\r\n");
+        return 0;
+    }
+
+    int16_t rawValue1 = (int16_t)((buf1[0] << 8) | buf1[1]);
+    int16_t rawValue2 = (int16_t)((buf2[0] << 8) | buf2[1]);
+
+    if (rawValue1 != rawValue2) {
+        xil_printf("[WARNING] ADC glitch filtered: %d vs %d\r\n", rawValue1,
+                   rawValue2);
+        return 0;
+    }
 
     *valid = true;
     // 2. Convert to voltage
-    return (float)rawValue * 0.125f;
+    return (float)rawValue1 * 0.1875;
 }
 
 void vTaskPwm(void *pvParameters)
@@ -730,6 +819,7 @@ void vTaskPwm(void *pvParameters)
         switch (currentState)
         {
             case PLAY_STATE:
+                globalretries = 1;
                 // Resets the index just if a new process was started
                 if (prevState != currentState){
                     if (prevState == STOP_STATE || prevState == DONE_STATE){
@@ -766,7 +856,12 @@ void vTaskPwm(void *pvParameters)
                 {
                     // Get current PWM value from em_ctrl vector. considering that the variables are 13 bits length
                     int16_t pwmValueRaw = get13s(op->em[i].em_ctrl, op->em[i].playbackIndex);
-                    float pwmValue = (float)pwmValueRaw / MAX_MAGNETIC_FIELD * 100.0f;
+                    //float pwmValue = (float)pwmValueRaw / MAX_MAGNETIC_FIELD * 100.0f;
+                    
+                    float pwmValue = (float)pwmValueRaw *gain_kalman[i].gain;                    
+                    lastEmControl[i] = pwmValue;
+
+
                     // Calculate percentage × 100 (e.g., 75.25% → 7525)
                     int32_t percent_x100 = (pwmValueRaw * 10000) / MAX_MAGNETIC_FIELD;
                     int32_t decimal_part = percent_x100 % 100;
@@ -830,12 +925,14 @@ void vTaskPwm(void *pvParameters)
 
             case STOP_STATE:
             case DONE_STATE:
+                globalretries = 3;
                 // Disable all the outputs
                 op->outputsStatus = false;
                 disableAllDutyCycle();
                 for (int id = 0; id < 30; id++)
                 {
                     setDutyCycle(id, 0);
+                    lastEmControl[id] = 0;
                     if (mangetStatus[id])
                     {
                         setledPanelColor(id,0,MAX_PANEL_BRIGHTNESS,0);
@@ -862,6 +959,7 @@ void vTaskPwm(void *pvParameters)
                 break;        
 
             case PAUSE_STATE:
+                globalretries = 3;
                 // Disable all the outputs
                 op->outputsStatus = false;
                 disableAllDutyCycle();
@@ -874,6 +972,7 @@ void vTaskPwm(void *pvParameters)
 
                 for (int id = 0; id < 30; id++)
                 {
+                    lastEmControl[id] = 0;
                     setDutyCycle(id, 0);
                     if (mangetStatus[id])
                     {
@@ -906,12 +1005,14 @@ void vTaskPwm(void *pvParameters)
         }
 
         // DBG
+        /*
         if (currentState != PLAY_STATE){
             for (int i = 0; i < NUM_EM; i++)
                 {
                     // Get current PWM value from em_ctrl vector. considering that the variables are 13 bits length
                     int16_t pwmValueRaw = get13s(op->em[i].em_ctrl, op->em[i].playbackIndex);
-                    float pwmValue = (float)pwmValueRaw / MAX_MAGNETIC_FIELD * 100.0f;
+                    //float pwmValue = (float)pwmValueRaw / MAX_MAGNETIC_FIELD * 100.0f;
+                    float pwmValue = (float)pwmValueRaw *gain_kalman[i].gain;
                     // Calculate percentage × 100 (e.g., 75.25% → 7525)
                     int32_t percent_x100 = (pwmValueRaw * 10000) / MAX_MAGNETIC_FIELD;
                     int32_t decimal_part = percent_x100 % 100;
@@ -932,11 +1033,11 @@ void vTaskPwm(void *pvParameters)
                             );
                         //xil_printf("tick count: %u\r\n",xTaskGetTickCount());       
                     }
-
+                    lastEmControl[i] = pwmValueRaw;
                     setDutyCycle(i, pwmValue);
                 }
         }
-
+        */
         if (op->signalSamplePeriodMs<4)
         {
             vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(4));
@@ -981,6 +1082,12 @@ int main(void)
         op.em[i].mode = 1;
         op.em[i].magnetic_field_amplitude = 1500;
         op.em[i].em_group = 1;
+
+        gain_kalman[i].gain = 0.033333;
+        gain_kalman[i].P = 1.0f;
+        gain_kalman[i].Q = 1e-12f;
+        gain_kalman[i].R = 1e-2;
+        
     }
     op.cfle_pwr = cfle_pwr;
     xil_printf("done\r\n");
