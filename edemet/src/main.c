@@ -122,24 +122,24 @@ void gain_kalman_update(gain_kalman_t *kf,
     if (fabs(realsetpoint) < 20)
         return;
 
-    float alpha = 0.001f;   // slow adaptation
+    float alpha = 0.0005f;   // slow adaptation
 
     static float num = 0;
     static float den = 0;
 
     float predictedMeasurement = realsetpoint;
     float error = predictedMeasurement-measuredField;
-    float tempGain = kf->gain*(1-alpha) + alpha * error/realsetpoint; 
+    float tempGain = kf->gain + alpha * error/realsetpoint; 
 
-    if (tempGain < 0.0033333) tempGain = 0.0033333; // prevent too low gain
-    if (tempGain > 0.33333) tempGain = 0.33333; // prevent too high gain
+    if (tempGain < 0.01) tempGain = 0.01; // prevent too low gain
+    if (tempGain > 0.1) tempGain = 0.1; // prevent too high gain
     kf->gain = tempGain;
 
-    if (counter++==32)
+    /*if (counter++==32)
     {
         counter = 0;
         printf("gain for EM: %f, setpoint: %f, measured: %f\r\n", kf->gain, realsetpoint, measuredField);
-    }
+    }*/
 
 }
 
@@ -319,8 +319,9 @@ void vTaskMagnet(void *pvParameters)
                     tempAdcValue= readADC(baseAddr, &valid1);
                     if (valid1)
                     {
-                        op->em[group_index*5+ii].last_em_measure = interpretMagneticField(tempAdcValue);                                            
                         gain_kalman_update(&gain_kalman[group_index*5+ii], lastEmControl[group_index*5+ii], op->em[group_index*5+ii].last_em_measure);
+                        op->em[group_index*5+ii].last_em_measure = interpretMagneticField(tempAdcValue);                                            
+                        
                     }
                 }
                 if (once)

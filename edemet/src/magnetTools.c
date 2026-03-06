@@ -63,11 +63,22 @@ void setDutyCycle(uint8_t id, float dutyCycle)
         perror("ID not valid\n");
         return;
     }
+    float duty_cycle =dutyCycle;
+    
+    if (duty_cycle>100)
+    {
+        duty_cycle = 100;
+    }
+    if (duty_cycle<-100)
+    {
+        duty_cycle=-100;
+    }
+
     int32_t TIMING_REG;
     TIMING_REG = Xil_In32(PWM_ADDRESS[id]);
 
     int32_t DC_REG;
-    DC_REG = TIMING_REG * dutyCycle / 100;
+    DC_REG = TIMING_REG * duty_cycle / 100;
     Xil_Out32(PWM_ADDRESS[id] + 4, DC_REG);
     //printf("Set PWM N %u at %.2f %%. DC REG: %d. Timing REG: %d\n",id,dutyCycle,DC_REG, TIMING_REG);
 }
