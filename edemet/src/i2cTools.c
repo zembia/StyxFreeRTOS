@@ -63,7 +63,7 @@ void I2C_ResetBus(UINTPTR BaseAddress) {
     xil_printf("Timing TLOW    reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x140));
     xil_printf("Timing THDDAT     reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x144));
 */
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(5));
     uint32_t CntlReg = XIic_ReadReg(BaseAddress,  XIIC_CR_REG_OFFSET);
     CntlReg = XIIC_CR_MSMS_MASK | XIIC_CR_ENABLE_DEVICE_MASK;		
     //XIic_WriteReg(BaseAddress,  XIIC_CR_REG_OFFSET, CntlReg);
@@ -324,7 +324,7 @@ uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok, bool *pcie_status)
     }
     for (i=0;i<5;i++)
     {
-        
+        vTaskDelay(pdMS_TO_TICKS(2));
         if (setIICmux(BaseAddress,1<<i) != true)
         {
             printf("\tError setting IIC mux to channel %d\r\n",i);
@@ -332,6 +332,7 @@ uint8_t checkIICchannel(UINTPTR BaseAddress, bool *em_ok, bool *pcie_status)
             pciOk = false;
             continue;
         }
+        vTaskDelay(pdMS_TO_TICKS(2));
         printf("\tPort %d...\r\n",i);
 
         everythingOK = true;

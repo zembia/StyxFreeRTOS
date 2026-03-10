@@ -15,7 +15,7 @@
 #define BITS_POWER 11
 #define BITS_PAUSE 1
 
-#define MAX_PANEL_BRIGHTNESS 50
+#define MAX_PANEL_BRIGHTNESS 20
 #define MAX_PANEL_BRIGHTNESS_RED 10
 
 #define EM_VECTOR_SIZE MAX_SAMPLES_PER_EM*BITS_MAGNETIC_FIELD/8 // size in bytes, not actually the number of samples

@@ -122,7 +122,7 @@ void gain_kalman_update(gain_kalman_t *kf,
     if (fabs(realsetpoint) < 20)
         return;
 
-    float alpha = 0.0005f;   // slow adaptation
+    float alpha = 0.0001f;   // slow adaptation
 
     static float num = 0;
     static float den = 0;

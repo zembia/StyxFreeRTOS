@@ -32,10 +32,65 @@ float interpretTempearture(int16_t rawValue) {
     return Temp;
 }
 
+
+const uint8_t translateVectorLED[30]={25,26,27,28,29, // Group A
+                                14,13,12,11,10, // Group B 
+                                19,18,17,16,15, //Group C
+                                20,21,22,23,24, //Group D
+                                0,1,2,3,4, //Group E
+                                5,6,7,8,9 //group F
+                            };
+
+
+/*
+//F is 25, group index is 5
+translateVectorLED[0] = 25+4;
+translateVectorLED[1] = 25+3;
+translateVectorLED[2] = 25+2;
+translateVectorLED[3] = 25+1;
+translateVectorLED[4] = 25+0;
+
+//E is 20
+translateVectorLED[5] = 20+4;
+translateVectorLED[6] = 20+3;
+translateVectorLED[7] = 20+2;
+translateVectorLED[8] = 20+1;
+translateVectorLED[9] = 20+0;
+
+//C is 15
+translateVectorLED[10] = 15+4;
+translateVectorLED[11] = 15+3;
+translateVectorLED[12] = 15+2;
+translateVectorLED[13] = 15+1;
+translateVectorLED[14] = 15+0;
+
+//B is 10
+translateVectorLED[15] = 10+4;
+translateVectorLED[16] = 10+3;
+translateVectorLED[17] = 10+2;
+translateVectorLED[18] = 10+1;
+translateVectorLED[19] = 10+0;
+
+//A is 5
+translateVectorLED[20] = 5+4;
+translateVectorLED[21] = 5+3;
+translateVectorLED[22] = 5+2;
+translateVectorLED[23] = 5+1;
+translateVectorLED[24] = 5+0;
+
+//D is 0
+translateVectorLED[25] = 0+4;
+translateVectorLED[26] = 0+3;
+translateVectorLED[27] = 0+2;
+translateVectorLED[28] = 0+1;
+translateVectorLED[29] = 0+0;
+
+*/
 void setledPanelColor(uint8_t LED, uint8_t R, uint8_t G, uint8_t B)
 {
     uint32_t dataOut;
-    dataOut = LED<<24 | R<<16 | G<<8 | B;
+    uint8_t realLED = translateVectorLED[LED];
+    dataOut = realLED<<24 | R<<16 | G<<8 | B;
     Xil_Out32(XPAR_WS2812B_DRIVER_0_BASEADDR, dataOut);
 }
 
