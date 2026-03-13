@@ -1144,9 +1144,16 @@ int main(void)
         op.em[i].em_measure = em_measure[i];
         op.em[i].em_pwr = em_pwr[i];
         op.em[i].em_temp = em_temp[i];
-        op.em[i].mode = 1;
-        op.em[i].magnetic_field_amplitude = 1500;
+        op.em[i].sample_period = 100;
+        op.em[i].mode = 1;        
+        op.em[i].duty_cycle = 50;
+        op.em[i].frequency_factor = 1;
+        op.em[i].magnetic_field_offset = 0;
+        op.em[i].magnetic_field_amplitude = 1000;
         op.em[i].em_group = 1;
+        op.em[i].coils_columns = 1;
+        op.em[i].rotational_frequency_factor = 1;
+    
 
         gain_kalman[i].gain = 0.033333;
         gain_kalman[i].P = 1.0f;
