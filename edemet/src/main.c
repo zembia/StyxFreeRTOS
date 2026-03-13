@@ -110,19 +110,22 @@ typedef struct
 
 gain_kalman_t gain_kalman[NUM_EM];  
 float lastEmControl[NUM_EM]={0};
+float newSetPoint[NUM_EM]={0};
+
 
 
 void gain_kalman_update(gain_kalman_t *kf,
                         float setPoint,
                         float measuredField)
 {   
+    //return;
     static uint8_t counter = 0;
     float realsetpoint = setPoint/kf->gain;
 
     if (fabs(realsetpoint) < 20)
         return;
 
-    float alpha = 0.0001f;   // slow adaptation
+    float alpha = 0.001f;   // slow adaptation
 
     static float num = 0;
     static float den = 0;
@@ -164,10 +167,7 @@ void vTaskMagnet(void *pvParameters)
         xSemaphoreTake(cfg->waitSem, portMAX_DELAY);
     }
     xil_printf("Starting %s at address 0x%08x\r\n", pcTaskName, baseAddr);    
-    // 3. Signal the next task in the chain
-    if (cfg->signalSem != NULL) {
-        xSemaphoreGive(cfg->signalSem);
-    }
+
     TickType_t lastWake = xTaskGetTickCount();    
 
     uint8_t group_index = 0xFF;
@@ -213,8 +213,11 @@ void vTaskMagnet(void *pvParameters)
     bool magnetReadStartedOk[5] = {true, true, true, true, true};
     bool TempReadStartedOk[5] = {true, true, true, true, true};
     //we check the presence of every magnet
-    
+    if (cfg->signalSem != NULL) {
+        xSemaphoreGive(cfg->signalSem);
+    }
     checkIICchannel(baseAddr,&mangetStatus[group_index*5],&pcieStatus[group_index*5]);
+    // 3. Signal the next task in the chain
 
     for (int i=0;i<5;i++)
     {
@@ -244,7 +247,7 @@ void vTaskMagnet(void *pvParameters)
 
     while (1)
     {   
-        vTaskDelayUntil(&lastWake2, pdMS_TO_TICKS(8)); 
+        vTaskDelayUntil(&lastWake2, pdMS_TO_TICKS(10)); 
         //xil_printf("[DBG] Loop start\r\n");
         startTime = xTaskGetTickCount();
         // Start EM conversion of magnetic field (ADC)
@@ -254,7 +257,11 @@ void vTaskMagnet(void *pvParameters)
         {
             if (mangetStatus[group_index*5+ii])
             {                
-                setIICmux(baseAddr, 1 << ii);
+                if (setIICmux(baseAddr, 1 << ii) == 0)
+                {
+                    magnetReadStartedOk[ii] = false;
+                    continue;
+                }
                 //Reading temperature converted in last loop
 
                 if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
@@ -262,7 +269,7 @@ void vTaskMagnet(void *pvParameters)
                     vTaskDelay(pdMS_TO_TICKS(2));
                 }
                 //only read if the previous conversion was started ok, otherwise we would be reading magnet data instead of temp.
-                if (TempReadStartedOk[ii] == true)
+                if ((TempReadStartedOk[ii] == true) && (magnetReadStartedOk[ii]))
                 {
                     tempAdcValue= readADC(baseAddr, &valid1);
                     if (valid1)
@@ -272,30 +279,50 @@ void vTaskMagnet(void *pvParameters)
                     }
                 }
             
+
+                //initing magnetic field conversion
+                magnetReadStartedOk[ii] = initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
                 if (once)
                 {
                     lastADC_READ = xTaskGetTickCount();
                     once = false;
-                }
-                //initing magnetic field conversion
-                magnetReadStartedOk[ii] = initReadADC(baseAddr, ADS1115_MAGNETIC_FIELD);
+                } 
                 
-                
-                
+               /* 
                 //Reading INA
                 uint8_t buf[3] = {0x08, 0x00, 0x00};
 
 
                 if (!INA_readReg(baseAddr,0x08,buf,3))
                 {
-                    xil_printf("[ERROR] Failed to read INA data for EM %d\r\n", ii);
+                    xil_printf("[ERROR] Failed to read INA data for EM %d, group %d\r\n", ii, group_index);
+                    //op->em[group_index*5+ii].last_em_pwr = 0;
+                    continue;
+                }
+
+                // Save EM power
+                op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/250000;*/
+                
+                
+            }/*
+            else if (pcieStatus[group_index*5+ii])
+            {
+               //Reading INA
+                uint8_t buf[3] = {0x08, 0x00, 0x00};
+
+
+                if (!INA_readReg(baseAddr,0x08,buf,3))
+                {
+                    xil_printf("[ERROR] Failed to read INA data for EM %d, group %d\r\n", ii, group_index);
                     //op->em[group_index*5+ii].last_em_pwr = 0;
                     continue;
                 }
 
                 // Save EM power
                 op->em[group_index*5+ii].last_em_pwr = ((((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8)  | ((uint32_t)buf[2]))*240)/250000;
-            }
+                
+                op->em[group_index*5+ii].last_em_temp = 0;
+            }*/
             else
             {
                 op->em[group_index*5+ii].last_em_pwr = 0;
@@ -311,7 +338,12 @@ void vTaskMagnet(void *pvParameters)
             {
                 if (magnetReadStartedOk[ii] == true)
                 {                
-                    setIICmux(baseAddr, 1 << ii);
+                    if (setIICmux(baseAddr, 1 << ii) == 0)
+                    {
+                        TempReadStartedOk[ii] = false;
+                        continue;
+                    }
+
                     if (once && ((xTaskGetTickCount() - lastADC_READ) <= pdMS_TO_TICKS(2)))
                     {
                         vTaskDelay(pdMS_TO_TICKS(2));
@@ -319,17 +351,21 @@ void vTaskMagnet(void *pvParameters)
                     tempAdcValue= readADC(baseAddr, &valid1);
                     if (valid1)
                     {
+                                    
                         gain_kalman_update(&gain_kalman[group_index*5+ii], lastEmControl[group_index*5+ii], op->em[group_index*5+ii].last_em_measure);
+                        //delayedlastEmControl[group_index*5+ii] = lastEmControl[group_index*5+ii];
+                        //delayedlastEmControl2[group_index*5+ii] = delayedlastEmControl[group_index*5+ii];
                         op->em[group_index*5+ii].last_em_measure = interpretMagneticField(tempAdcValue);                                            
                         
                     }
                 }
+
+                TempReadStartedOk[ii] = initReadADC(baseAddr, ADS1115_TEMP1);
                 if (once)
                 {
                     lastADC_READ = xTaskGetTickCount();
                     once= false;
                 }
-                TempReadStartedOk[ii] = initReadADC(baseAddr, ADS1115_TEMP1);
             }
             else
             {
@@ -712,6 +748,16 @@ bool initReadADC(UINTPTR baseAddr, uint16_t channel) {
     }
     uint16_t flip_recvBuf = recvBuf << 8 | recvBuf >> 8;
 
+
+    if (!I2C_SafeRecv(baseAddr, 0x48, &recvBuf, 2, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to read ADC config\r\n");
+        return 0;
+    }
+
+    uint16_t flip_recvBuf2 =  recvBuf << 8 | recvBuf >> 8;
+
+
+
     bool conversionStarted = (flip_recvBuf&0x8000) == 0;
     if (conversionStarted == false)
     {
@@ -724,7 +770,12 @@ bool initReadADC(UINTPTR baseAddr, uint16_t channel) {
         xil_printf("[ERROR] ADC channel not changed succesfully\r\n");
         return 0;
     }
-    
+
+    if (flip_recvBuf != flip_recvBuf)
+    {
+        xil_printf("[ERROR] glitch read ADC config\r\n");
+        return 0;
+    }
 
     return 1;
 }
@@ -741,6 +792,7 @@ int16_t readADC(UINTPTR baseAddr, bool *valid) {
     
     uint8_t buf1[2];
     uint8_t buf2[2];
+    uint8_t buf3[2];
     if (!I2C_SafeRecv(baseAddr, 0x48, buf1, 2, XIIC_STOP)) {
         xil_printf("[ERROR] Failed to read ADC data #1\r\n");
         return 0;
@@ -750,15 +802,27 @@ int16_t readADC(UINTPTR baseAddr, bool *valid) {
         xil_printf("[ERROR] Failed to read ADC data #2\r\n");
         return 0;
     }
+/*
+    if (!I2C_SafeRecv(baseAddr, 0x48, buf3, 2, XIIC_STOP)) {
+        xil_printf("[ERROR] Failed to read ADC data #2\r\n");
+        return 0;
+    }*/
 
     int16_t rawValue1 = (int16_t)((buf1[0] << 8) | buf1[1]);
     int16_t rawValue2 = (int16_t)((buf2[0] << 8) | buf2[1]);
+   // int16_t rawValue3 = (int16_t)((buf3[0] << 8) | buf3[1]);
 
     if (rawValue1 != rawValue2) {
         xil_printf("[WARNING] ADC glitch filtered: %d vs %d\r\n", rawValue1,
                    rawValue2);
         return 0;
     }
+
+   /* if (rawValue1 != rawValue3) {
+        xil_printf("[WARNING] ADC glitch filtered: %d vs %d\r\n", rawValue1,
+                   rawValue3);
+        return 0;
+    }*/
 
     *valid = true;
     // 2. Convert to voltage

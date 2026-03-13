@@ -22,7 +22,7 @@
 			interrupts = < 0 31 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -43,13 +43,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_AXI_IIC_A";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_AXI_IIC_B: i2c@81640000 {
 			interrupts = < 0 32 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -70,13 +70,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_AXI_IIC_B";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_AXI_IIC_C: i2c@81650000 {
 			interrupts = < 0 33 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -97,13 +97,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_AXI_IIC_C";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_AXI_IIC_D: i2c@81660000 {
 			interrupts = < 0 34 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -124,13 +124,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_AXI_IIC_D";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_AXI_IIC_E: i2c@81670000 {
 			interrupts = < 0 35 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -151,13 +151,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_AXI_IIC_E";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_AXI_IIC_F: i2c@81680000 {
 			interrupts = < 0 36 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -178,12 +178,12 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_AXI_IIC_F";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_axi_iic_current: i2c@81600000 {
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
 			reg = <0x81600000 0x10000>;
@@ -202,13 +202,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_axi_iic_current";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_axi_iic_ioexp_1: i2c@81610000 {
 			interrupts = < 0 29 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -229,13 +229,13 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_axi_iic_ioexp_1";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		I2C_MAGNET_PORTS_axi_iic_ioexp_2: i2c@81620000 {
 			interrupts = < 0 30 4 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
-			xlnx,scl-inertial-delay = <40>;
+			xlnx,scl-inertial-delay = <10>;
 			interrupt-parent = <&intc>;
 			xlnx,ip-name = "axi_iic";
 			xlnx,disable-setup-violation-check = <0>;
@@ -256,7 +256,7 @@
 			xlnx,smbus-pmbus-host = <0>;
 			xlnx,name = "I2C_MAGNET_PORTS_axi_iic_ioexp_2";
 			xlnx,axi-aclk-freq-mhz = <90>;
-			xlnx,sda-inertial-delay = <40>;
+			xlnx,sda-inertial-delay = <10>;
 		};
 		PWM_MagnetPWMController_0: MagnetPWMController@43c00000 {
 			compatible = "xlnx,MagnetPWMController-1.0";

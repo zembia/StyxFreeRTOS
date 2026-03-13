@@ -45,6 +45,8 @@ bool I2C_CheckBusIdle(UINTPTR BaseAddress) {
  * @brief Reset I2C bus - clears errors and reinitializes
  */
 void I2C_ResetBus(UINTPTR BaseAddress) {
+
+    
     // Clear all interrupt flags
     XIic_WriteReg(BaseAddress, XIIC_IISR_OFFSET, 0xFFFFFFFF);
     
@@ -53,8 +55,8 @@ void I2C_ResetBus(UINTPTR BaseAddress) {
     
 
     //Do timing adjustment
-/*
-    xil_printf("Timing TSUSTA reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x128));
+
+   /* xil_printf("Timing TSUSTA reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x128));
     xil_printf("Timing TSUSTB  reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x12C));
     xil_printf("Timing THDSTA  reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x130));
     xil_printf("Timing TSUDAT  reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x134));
@@ -63,15 +65,15 @@ void I2C_ResetBus(UINTPTR BaseAddress) {
     xil_printf("Timing TLOW    reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x140));
     xil_printf("Timing THDDAT     reg: %08X\r\n",XIic_ReadReg(BaseAddress, 0x144));
 */
-    vTaskDelay(pdMS_TO_TICKS(5));
-    uint32_t CntlReg = XIic_ReadReg(BaseAddress,  XIIC_CR_REG_OFFSET);
-    CntlReg = XIIC_CR_MSMS_MASK | XIIC_CR_ENABLE_DEVICE_MASK;		
+    vTaskDelay(pdMS_TO_TICKS(10));
+    //uint32_t CntlReg = XIic_ReadReg(BaseAddress,  XIIC_CR_REG_OFFSET);
+    //CntlReg = XIIC_CR_MSMS_MASK | XIIC_CR_ENABLE_DEVICE_MASK;		
     //XIic_WriteReg(BaseAddress,  XIIC_CR_REG_OFFSET, CntlReg);
 
 
-    /*XIic_WriteReg(BaseAddress, 0x13C, 58);
-    XIic_WriteReg(BaseAddress, 0x140, 58);*/
-    
+   /* XIic_WriteReg(BaseAddress, 0x13C, 180);
+    XIic_WriteReg(BaseAddress, 0x140, 180);*/
+  
 
     
     
@@ -129,7 +131,6 @@ bool I2C_SafeSend(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t l
         // Failed - reset and retry
         xil_printf("[I2C] Send failed (sent %d/%d), retry %d\r\n", sent, len, retries);
         I2C_ResetBus(BaseAddress);
-        vTaskDelay(pdMS_TO_TICKS(5));
     }
     
     return false;
@@ -185,13 +186,12 @@ bool I2C_SafeRecv(UINTPTR BaseAddress, uint8_t DevAddr, uint8_t *data, uint8_t l
         // Failed - reset and retry
         xil_printf("[I2C] Recv failed (got %d/%d), retry %d\r\n", received, len, retries);
         I2C_ResetBus(BaseAddress);
-        vTaskDelay(pdMS_TO_TICKS(5));
     }
     
     return false;
 }
 
-uint8_t ADDRESS_TO_CHECK[] = {INA740_ADDR,TMP102_ADDR,ADS1115_ADDR};
+uint8_t ADDRESS_TO_CHECK[] = {INA740_ADDR,ADS1115_ADDR};
 //uint8_t ADDRESS_TO_CHECK[] = {INA740_ADDR,TMP102_ADDR};
 
 //Function prototypes

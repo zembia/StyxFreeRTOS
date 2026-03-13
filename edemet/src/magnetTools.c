@@ -12,10 +12,10 @@ void updateTemperaturePL(uint8_t id, int32_t temperature)
 float interpretMagneticField(int16_t rawValue)
 {
     
-    return (rawValue-2330)/0.73;
+    return (rawValue-2500)/0.73;
 }
 
-#define REF_V 4680.0
+#define REF_V 5000.0
 #define R1 24000
 float interpretTempearture(int16_t rawValue) {
 
